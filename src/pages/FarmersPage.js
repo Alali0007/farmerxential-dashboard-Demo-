@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getFarmers } from '../api/farmerxential';
+import { getFarmers, createIntervention, getFarmerInterventions } from '../api/farmerxential';
 
 const C = {
   green: '#1B4332', gold: '#F59E0B',
@@ -34,6 +34,19 @@ const RECOMMENDATIONS = {
   transport_cost:            'Reduce transport barriers through local market access',
 };
 
+// These are the types of help a field officer can give
+// Think of it like a dropdown menu on a paper form
+const INTERVENTION_TYPES = [
+  { value: 'extension_visit',      label: 'Extension Officer Visit' },
+  { value: 'fertilizer_support',   label: 'Fertilizer Support' },
+  { value: 'credit_facilitation',  label: 'Credit Facilitation' },
+  { value: 'seed_distribution',    label: 'Seed Distribution' },
+  { value: 'training',             label: 'Training/Workshop' },
+  { value: 'emergency_support',    label: 'Emergency Support' },
+  { value: 'market_linkage',       label: 'Market Linkage' },
+  { value: 'other',                label: 'Other' },
+];
+
 function PriorityBadge({ level }) {
   const map = {
     2: { label: 'HIGH', color: C.high },
@@ -64,6 +77,38 @@ function FilterBtn({ label, active, onClick }) {
 }
 
 function FarmerDetailPanel({ farmer, onClose }) {
+  // ── Intervention form state ──
+  // showForm: is the form visible?
+  // formData: what the officer is typing
+  // submitting: is the API call in progress?
+  // submitStatus: 'success' or 'error' message to show after submit
+  // pastInterventions: previous visits for this farmer
+  const [showForm, setShowForm]               = useState(false);
+  const [formData, setFormData]               = useState({
+    officer_name: '',
+    intervention_type: 'extension_visit',
+    notes: ''
+  });
+  const [submitting, setSubmitting]           = useState(false);
+  const [submitStatus, setSubmitStatus]       = useState(null); // null | 'success' | 'error'
+  const [pastInterventions, setPastInterventions] = useState([]);
+  const [loadingHistory, setLoadingHistory]   = useState(false);
+
+  // Every time a new farmer is selected, reset the form and load their history
+  useEffect(() => {
+    if (!farmer) return;
+    setShowForm(false);
+    setFormData({ officer_name: '', intervention_type: 'extension_visit', notes: '' });
+    setSubmitStatus(null);
+
+    // Load past interventions for this farmer
+    // Think of it like: opening their visit history file
+    setLoadingHistory(true);
+    getFarmerInterventions(farmer.hhid)
+      .then(d => { setPastInterventions(d.interventions || []); setLoadingHistory(false); })
+      .catch(() => { setPastInterventions([]); setLoadingHistory(false); });
+  }, [farmer]);
+
   if (!farmer) return null;
 
   const level = farmer.predicted_intervention_level;
@@ -84,6 +129,58 @@ function FarmerDetailPanel({ farmer, onClose }) {
   if (farmer.received_credit === 0)      recommendations.push(RECOMMENDATIONS.received_credit);
 
   const assetLabel = Number(farmer.asset_score) < 0 ? 'Low' : Number(farmer.asset_score) < 1 ? 'Medium' : 'High';
+
+  // Handle form submission
+  // Think of it like: pressing SEND on the form
+  const handleSubmit = async () => {
+    // Basic validation — officer name is required
+    if (!formData.officer_name.trim()) {
+      setSubmitStatus('error');
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitStatus(null);
+
+    try {
+      await createIntervention({
+        farmer_id: farmer.hhid,
+        officer_name: formData.officer_name.trim(),
+        intervention_type: formData.intervention_type,
+        notes: formData.notes.trim() || null,
+        risk_score_at_intervention: farmer.risk_score
+      });
+
+      setSubmitStatus('success');
+      setShowForm(false);
+
+      // Reload past interventions to show the new one
+      const updated = await getFarmerInterventions(farmer.hhid);
+      setPastInterventions(updated.interventions || []);
+
+      // Reset form for next use
+      setFormData({ officer_name: '', intervention_type: 'extension_visit', notes: '' });
+
+    } catch (err) {
+      setSubmitStatus('error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Format date simply — e.g. "2 Jun 2026"
+  const formatDate = (isoString) => {
+    const d = new Date(isoString);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  // Outcome colour — green for success, red for no response, gold for pending
+  const outcomeColor = (outcome) => {
+    if (outcome === 'successful')       return C.low;
+    if (outcome === 'no_response')      return C.high;
+    if (outcome === 'follow_up_needed') return C.mid;
+    return C.dim; // pending
+  };
 
   return (
     <div style={{
@@ -176,7 +273,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
         <div style={{
           background: 'rgba(245,158,11,0.05)',
           border: `1px solid ${C.gold}40`,
-          borderRadius: 8, padding: 16
+          borderRadius: 8, padding: 16, marginBottom: 16
         }}>
           <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 10, fontWeight: 'bold' }}>
             ◈ RECOMMENDED INTERVENTIONS
@@ -193,6 +290,202 @@ function FarmerDetailPanel({ farmer, onClose }) {
           ))}
         </div>
       )}
+
+      {/* ── INTERVENTION SECTION ── */}
+      {/* This is the new section — the "Record Intervention" button and form */}
+      <div style={{
+        border: `1px solid ${C.green}`,
+        borderRadius: 8, padding: 16, marginBottom: 16
+      }}>
+        <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 12, fontWeight: 'bold' }}>
+          ◈ INTERVENTION TRACKING
+        </div>
+
+        {/* Success message — shown after successful submission */}
+        {submitStatus === 'success' && (
+          <div style={{
+            background: 'rgba(99,153,34,0.15)', border: `1px solid ${C.low}`,
+            borderRadius: 6, padding: '10px 14px', marginBottom: 12,
+            color: C.low, fontSize: 12
+          }}>
+            ✓ Intervention recorded successfully
+          </div>
+        )}
+
+        {/* Error message */}
+        {submitStatus === 'error' && (
+          <div style={{
+            background: 'rgba(226,75,74,0.1)', border: `1px solid ${C.high}`,
+            borderRadius: 6, padding: '10px 14px', marginBottom: 12,
+            color: C.high, fontSize: 12
+          }}>
+            ✗ Please enter officer name and try again
+          </div>
+        )}
+
+        {/* Record button — toggles the form */}
+        {!showForm && (
+          <button
+            onClick={() => { setShowForm(true); setSubmitStatus(null); }}
+            style={{
+              background: 'rgba(27,67,50,0.4)',
+              border: `1px solid ${C.dim}`,
+              color: C.dim, padding: '10px 16px',
+              borderRadius: 6, fontFamily: 'monospace',
+              fontSize: 11, cursor: 'pointer',
+              width: '100%', letterSpacing: 1,
+              transition: 'all 0.2s'
+            }}
+          >
+            + RECORD NEW INTERVENTION
+          </button>
+        )}
+
+        {/* Intervention Form */}
+        {showForm && (
+          <div>
+            {/* Officer Name */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ color: C.dim, fontSize: 10, marginBottom: 6, letterSpacing: 1 }}>
+                OFFICER NAME *
+              </div>
+              <input
+                placeholder="Enter your name..."
+                value={formData.officer_name}
+                onChange={e => setFormData({ ...formData, officer_name: e.target.value })}
+                style={{
+                  width: '100%', background: 'rgba(27,67,50,0.2)',
+                  border: `1px solid #1B4332`, borderRadius: 6,
+                  padding: '8px 12px', color: C.text,
+                  fontFamily: 'monospace', fontSize: 12,
+                  outline: 'none', boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Intervention Type */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ color: C.dim, fontSize: 10, marginBottom: 6, letterSpacing: 1 }}>
+                TYPE OF INTERVENTION *
+              </div>
+              <select
+                value={formData.intervention_type}
+                onChange={e => setFormData({ ...formData, intervention_type: e.target.value })}
+                style={{
+                  width: '100%', background: '#060D0A',
+                  border: `1px solid #1B4332`, borderRadius: 6,
+                  padding: '8px 12px', color: C.text,
+                  fontFamily: 'monospace', fontSize: 12,
+                  outline: 'none', boxSizing: 'border-box', cursor: 'pointer'
+                }}
+              >
+                {INTERVENTION_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Notes */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ color: C.dim, fontSize: 10, marginBottom: 6, letterSpacing: 1 }}>
+                NOTES (OPTIONAL)
+              </div>
+              <textarea
+                placeholder="Any additional observations..."
+                value={formData.notes}
+                onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
+                style={{
+                  width: '100%', background: 'rgba(27,67,50,0.2)',
+                  border: `1px solid #1B4332`, borderRadius: 6,
+                  padding: '8px 12px', color: C.text,
+                  fontFamily: 'monospace', fontSize: 12,
+                  outline: 'none', resize: 'vertical',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Form Buttons */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                style={{
+                  flex: 1, background: submitting ? 'rgba(27,67,50,0.3)' : 'rgba(27,67,50,0.6)',
+                  border: `1px solid ${C.dim}`,
+                  color: C.dim, padding: '10px 0',
+                  borderRadius: 6, fontFamily: 'monospace',
+                  fontSize: 11, cursor: submitting ? 'not-allowed' : 'pointer',
+                  letterSpacing: 1
+                }}
+              >
+                {submitting ? 'SAVING...' : '✓ SUBMIT'}
+              </button>
+              <button
+                onClick={() => { setShowForm(false); setSubmitStatus(null); }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #1B4332',
+                  color: '#1B4332', padding: '10px 16px',
+                  borderRadius: 6, fontFamily: 'monospace',
+                  fontSize: 11, cursor: 'pointer'
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── PAST INTERVENTIONS ── */}
+      {/* Shows the history of all previous visits for this farmer */}
+      <div style={{
+        background: 'rgba(27,67,50,0.1)', border: '1px solid #1B4332',
+        borderRadius: 8, padding: 16
+      }}>
+        <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 12, fontWeight: 'bold' }}>
+          ◈ INTERVENTION HISTORY ({pastInterventions.length})
+        </div>
+
+        {loadingHistory && (
+          <div style={{ color: C.dim, fontSize: 11, textAlign: 'center', padding: 12 }}>
+            LOADING HISTORY...
+          </div>
+        )}
+
+        {!loadingHistory && pastInterventions.length === 0 && (
+          <div style={{ color: C.dim, fontSize: 11, textAlign: 'center', padding: 12 }}>
+            No interventions recorded yet
+          </div>
+        )}
+
+        {!loadingHistory && pastInterventions.map((iv) => (
+          <div key={iv.id} style={{
+            background: 'rgba(27,67,50,0.2)', borderRadius: 6,
+            padding: '10px 12px', marginBottom: 8,
+            borderLeft: `3px solid ${outcomeColor(iv.outcome)}`
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ color: C.text, fontSize: 11, fontWeight: 'bold' }}>
+                {INTERVENTION_TYPES.find(t => t.value === iv.intervention_type)?.label || iv.intervention_type}
+              </span>
+              <span style={{ color: outcomeColor(iv.outcome), fontSize: 10, fontWeight: 'bold' }}>
+                {iv.outcome.toUpperCase().replace('_', ' ')}
+              </span>
+            </div>
+            <div style={{ color: C.dim, fontSize: 10 }}>
+              {iv.officer_name} · {formatDate(iv.created_at)}
+            </div>
+            {iv.notes && (
+              <div style={{ color: C.text, fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>
+                "{iv.notes}"
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -207,7 +500,6 @@ export default function FarmersPage({ initialZone = null }) {
   const [search, setSearch]     = useState('');
   const LIMIT = 50;
 
-  // Fetch from API whenever zone, priority or offset changes
   useEffect(() => {
     setLoading(true);
     setSelected(null);
@@ -350,14 +642,12 @@ export default function FarmersPage({ initialZone = null }) {
             <span>SHOCK</span>
           </div>
 
-          {/* No results */}
           {filteredFarmers.length === 0 && !loading && (
             <div style={{ padding: 40, textAlign: 'center', color: C.dim, fontSize: 12 }}>
               {search ? `NO FARMERS FOUND MATCHING "${search}"` : 'NO DATA AVAILABLE'}
             </div>
           )}
 
-          {/* Rows */}
           {filteredFarmers.map((f, i) => (
             <div key={f.hhid}
               onClick={() => setSelected(f)}
@@ -395,7 +685,7 @@ export default function FarmersPage({ initialZone = null }) {
           ))}
         </div>
 
-        {/* Pagination — only show when not searching */}
+        {/* Pagination */}
         {!search && (
           <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: 'center', alignItems: 'center' }}>
             <button
@@ -410,7 +700,6 @@ export default function FarmersPage({ initialZone = null }) {
                 cursor: offset === 0 ? 'not-allowed' : 'pointer'
               }}>← PREV</button>
 
-            {/* Page numbers */}
             <div style={{ display: 'flex', gap: 4 }}>
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 const pageNum = Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i;

@@ -27,8 +27,10 @@ export const getStats = async () => {
   return res.data;
 };
 
-export const getFarmers = async (zone = null, priority = null) => {
-  const params = {};
+// FIX: now properly sends limit and offset to the API
+// Before, these two params were being ignored — pagination wasn't working
+export const getFarmers = async (zone = null, priority = null, limit = 50, offset = 0) => {
+  const params = { limit, offset };
   if (zone !== null) params.zone = zone;
   if (priority !== null) params.priority = priority;
   const res = await axios.get(`${API_BASE}/farmers`, { headers: headers(), params });
@@ -47,5 +49,54 @@ export const predict = async (farmerData) => {
 
 export const getPredictionHistory = async () => {
   const res = await axios.get(`${API_BASE}/predictions/history`, { headers: headers() });
+  return res.data;
+};
+
+// ==============================
+// NEW: INTERVENTION FUNCTIONS
+// ==============================
+
+// Record a new intervention for a farmer
+// Think of it like: field officer fills in a form after visiting a farmer
+export const createIntervention = async (interventionData) => {
+  const res = await axios.post(
+    `${API_BASE}/interventions`,
+    interventionData,
+    { headers: headers() }
+  );
+  return res.data;
+};
+
+// Get all interventions for one specific farmer
+// Think of it like: opening a farmer's visit history file
+export const getFarmerInterventions = async (farmerId) => {
+  const res = await axios.get(
+    `${API_BASE}/interventions/farmer/${farmerId}`,
+    { headers: headers() }
+  );
+  return res.data;
+};
+
+// Get ALL interventions across all farmers (for NDDC dashboard)
+// Think of it like: the full register of every visit ever made
+export const getAllInterventions = async (outcome = null, officerName = null, limit = 100, offset = 0) => {
+  const params = { limit, offset };
+  if (outcome) params.outcome = outcome;
+  if (officerName) params.officer_name = officerName;
+  const res = await axios.get(
+    `${API_BASE}/interventions`,
+    { headers: headers(), params }
+  );
+  return res.data;
+};
+
+// Update the outcome of an intervention
+// Think of it like: officer comes back and writes what happened after the visit
+export const updateIntervention = async (interventionId, updateData) => {
+  const res = await axios.patch(
+    `${API_BASE}/interventions/${interventionId}`,
+    updateData,
+    { headers: headers() }
+  );
   return res.data;
 };
