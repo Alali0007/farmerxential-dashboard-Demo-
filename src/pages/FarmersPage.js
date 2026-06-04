@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getFarmers, createIntervention, getFarmerInterventions } from '../api/farmerxential';
+import { getFarmers, createIntervention, getFarmerInterventions, updateIntervention } from '../api/farmerxential';
 
 const C = {
   green: '#1B4332', gold: '#F59E0B',
@@ -141,6 +141,18 @@ function FarmerDetailPanel({ farmer, onClose }) {
     }
   };
 
+  // Update intervention outcome
+  // Think of it like: officer comes back and ticks what happened
+  const handleOutcomeChange = async (interventionId, newOutcome) => {
+    try {
+      await updateIntervention(interventionId, { outcome: newOutcome });
+      const updated = await getFarmerInterventions(farmer.hhid);
+      setPastInterventions(updated.interventions || []);
+    } catch (err) {
+      console.error('Failed to update outcome', err);
+    }
+  };
+
   const formatDate = (isoString) => {
     const d = new Date(isoString);
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -161,6 +173,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
       fontFamily: 'monospace', color: C.text,
       boxShadow: `-8px 0 40px ${color}22`
     }}>
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <div style={{ color: C.gold, fontSize: 18, fontWeight: 'bold' }}>HHID {farmer.hhid}</div>
@@ -173,6 +186,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
         }}>✕</button>
       </div>
 
+      {/* Priority */}
       <div style={{
         background: `${color}11`, border: `2px solid ${color}`,
         borderRadius: 10, padding: '16px 20px', textAlign: 'center', marginBottom: 16
@@ -184,6 +198,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
         </div>
       </div>
 
+      {/* Farm Details */}
       <div style={{
         background: 'rgba(27,67,50,0.2)', border: '1px solid #1B4332',
         borderRadius: 8, padding: 16, marginBottom: 16
@@ -210,6 +225,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
         ))}
       </div>
 
+      {/* Why at risk */}
       {reasons.length > 0 && (
         <div style={{
           background: 'rgba(226,75,74,0.06)', border: '1px solid rgba(226,75,74,0.3)',
@@ -227,6 +243,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
         </div>
       )}
 
+      {/* Recommendations */}
       {recommendations.length > 0 && (
         <div style={{
           background: 'rgba(245,158,11,0.05)', border: `1px solid ${C.gold}40`,
@@ -247,6 +264,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
         </div>
       )}
 
+      {/* Intervention Tracking */}
       <div style={{ border: `1px solid ${C.green}`, borderRadius: 8, padding: 16, marginBottom: 16 }}>
         <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 12, fontWeight: 'bold' }}>
           ◈ INTERVENTION TRACKING
@@ -343,6 +361,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
         )}
       </div>
 
+      {/* Past Interventions */}
       <div style={{
         background: 'rgba(27,67,50,0.1)', border: '1px solid #1B4332',
         borderRadius: 8, padding: 16
@@ -350,29 +369,57 @@ function FarmerDetailPanel({ farmer, onClose }) {
         <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 12, fontWeight: 'bold' }}>
           ◈ INTERVENTION HISTORY ({pastInterventions.length})
         </div>
+
         {loadingHistory && (
           <div style={{ color: C.dim, fontSize: 11, textAlign: 'center', padding: 12 }}>LOADING HISTORY...</div>
         )}
+
         {!loadingHistory && pastInterventions.length === 0 && (
-          <div style={{ color: C.dim, fontSize: 11, textAlign: 'center', padding: 12 }}>No interventions recorded yet</div>
+          <div style={{ color: C.dim, fontSize: 11, textAlign: 'center', padding: 12 }}>
+            No interventions recorded yet
+          </div>
         )}
+
         {!loadingHistory && pastInterventions.map((iv) => (
           <div key={iv.id} style={{
             background: 'rgba(27,67,50,0.2)', borderRadius: 6,
             padding: '10px 12px', marginBottom: 8,
             borderLeft: `3px solid ${outcomeColor(iv.outcome)}`
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'center' }}>
               <span style={{ color: C.text, fontSize: 11, fontWeight: 'bold' }}>
                 {INTERVENTION_TYPES.find(t => t.value === iv.intervention_type)?.label || iv.intervention_type}
               </span>
-              <span style={{ color: outcomeColor(iv.outcome), fontSize: 10, fontWeight: 'bold' }}>
-                {iv.outcome.toUpperCase().replace('_', ' ')}
-              </span>
+
+              {/* Outcome dropdown */}
+              {/* Officer can change pending → successful → no_response → follow_up_needed */}
+              {/* Think of it like: ticking what happened after the visit */}
+              <select
+                value={iv.outcome}
+                onChange={e => handleOutcomeChange(iv.id, e.target.value)}
+                style={{
+                  background: '#060D0A',
+                  border: `1px solid ${outcomeColor(iv.outcome)}`,
+                  color: outcomeColor(iv.outcome),
+                  padding: '3px 8px', borderRadius: 4,
+                  fontFamily: 'monospace', fontSize: 10,
+                  cursor: 'pointer', outline: 'none'
+                }}
+              >
+                <option value="pending">PENDING</option>
+                <option value="successful">SUCCESSFUL</option>
+                <option value="no_response">NO RESPONSE</option>
+                <option value="follow_up_needed">FOLLOW UP</option>
+              </select>
             </div>
-            <div style={{ color: C.dim, fontSize: 10 }}>{iv.officer_name} · {formatDate(iv.created_at)}</div>
+
+            <div style={{ color: C.dim, fontSize: 10 }}>
+              {iv.officer_name} · {formatDate(iv.created_at)}
+            </div>
             {iv.notes && (
-              <div style={{ color: C.text, fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>"{iv.notes}"</div>
+              <div style={{ color: C.text, fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>
+                "{iv.notes}"
+              </div>
             )}
           </div>
         ))}
@@ -381,9 +428,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
   );
 }
 
-export default function FarmersPage() {
-  // Read zone from URL — e.g. /farmers?zone=2
-  // useSearchParams reads the ?zone=2 part of the URL
+export default function FarmersPage({ onLoadingChange }) {
   const [searchParams] = useSearchParams();
   const initialZone = searchParams.get('zone') !== null
     ? parseInt(searchParams.get('zone'))
@@ -400,10 +445,18 @@ export default function FarmersPage() {
 
   useEffect(() => {
     setLoading(true);
+    if (onLoadingChange) onLoadingChange(true);
     setSelected(null);
     getFarmers(zone, priority, LIMIT, offset)
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(d => {
+        setData(d);
+        setLoading(false);
+        if (onLoadingChange) onLoadingChange(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        if (onLoadingChange) onLoadingChange(false);
+      });
   }, [zone, priority, offset]);
 
   const changeZone     = (z) => { setZone(z); setOffset(0); setSearch(''); };
@@ -472,7 +525,9 @@ export default function FarmersPage() {
       </div>
 
       {loading && (
-        <div style={{ color: C.dim, padding: 60, textAlign: 'center', fontSize: 13 }}>SCANNING DATABASE...</div>
+        <div style={{ color: C.dim, padding: 60, textAlign: 'center', fontSize: 13 }}>
+          SCANNING DATABASE...
+        </div>
       )}
 
       {data && <>
