@@ -18,6 +18,17 @@ const ZONES = [
   { name: 'South South',   lat: 5.0,  lng: 6.0  },
 ];
 
+// Mobile detection hook
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
 function StatCard({ label, value, color, pulse }) {
   return (
     <div style={{
@@ -39,15 +50,24 @@ function StatCard({ label, value, color, pulse }) {
   );
 }
 
-export default function OverviewPage({ onZoneClick }) {
+export default function OverviewPage({ onZoneClick, onLoadingChange }) {
+  const isMobile = useIsMobile();
   const [stats, setStats]       = useState(null);
   const [loading, setLoading]   = useState(true);
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
+    if (onLoadingChange) onLoadingChange(true);
     getStats()
-      .then(d => { setStats(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(d => {
+        setStats(d);
+        setLoading(false);
+        if (onLoadingChange) onLoadingChange(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        if (onLoadingChange) onLoadingChange(false);
+      });
   }, []);
 
   const handleZoneClick = (zoneName) => {
@@ -56,7 +76,7 @@ export default function OverviewPage({ onZoneClick }) {
   };
 
   return (
-    <div style={{ padding: 24, color: C.text, fontFamily: 'monospace' }}>
+    <div style={{ padding: isMobile ? 12 : 24, color: C.text, fontFamily: 'monospace' }}>
       <div style={{ color: C.gold, fontSize: 12, letterSpacing: 2, marginBottom: 20, fontWeight: 'bold' }}>
         ◈ AGRICULTURAL INTELLIGENCE OVERVIEW
       </div>
@@ -68,8 +88,15 @@ export default function OverviewPage({ onZoneClick }) {
       )}
 
       {stats && <>
-        {/* Stat Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
+        {/* Stat Cards — auto-fit works on both mobile and desktop */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile
+            ? 'repeat(2, 1fr)'
+            : 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: isMobile ? 8 : 12,
+          marginBottom: 20
+        }}>
           <StatCard label="Total Farmers"   value={stats.total_farmers.toLocaleString()} color={C.gold} pulse/>
           <StatCard label="High Priority"   value={stats.high_priority_count}            color={C.high} pulse/>
           <StatCard label="Medium Priority" value={stats.medium_priority_count}          color={C.mid}/>
@@ -78,21 +105,43 @@ export default function OverviewPage({ onZoneClick }) {
           <StatCard label="Avg Risk Score"  value={`${stats.avg_risk_score}%`}           color={C.gold}/>
         </div>
 
-        {/* Map + Zone Panel */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
+        {/* Map + Zone Panel
+            Desktop: side by side (map | zone list)
+            Mobile: stacked (zone list first, map below) */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 320px',
+          gap: isMobile ? 12 : 20
+        }}>
+
+          {/* On mobile: show zone list FIRST (more useful on small screen) */}
+          {isMobile && (
+            <ZoneList
+              zones={ZONES}
+              stats={stats}
+              selected={selected}
+              onZoneClick={handleZoneClick}
+            />
+          )}
 
           {/* MAP */}
-          <div style={{ background: 'rgba(27,67,50,0.1)', border: '1px solid #1B4332', borderRadius: 10, padding: 16 }}>
+          <div style={{
+            background: 'rgba(27,67,50,0.1)', border: '1px solid #1B4332',
+            borderRadius: 10, padding: isMobile ? 10 : 16
+          }}>
             <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 12, fontWeight: 'bold' }}>
-              ◈ NIGERIA ZONE MAP — CLICK A ZONE TO VIEW FARMERS
+              ◈ NIGERIA ZONE MAP — {isMobile ? 'TAP' : 'CLICK'} A ZONE TO VIEW FARMERS
             </div>
 
-            <div style={{ height: 420, borderRadius: 8, overflow: 'hidden', border: '1px solid #1B4332' }}>
+            <div style={{
+              height: isMobile ? 260 : 420,
+              borderRadius: 8, overflow: 'hidden', border: '1px solid #1B4332'
+            }}>
               <MapContainer
                 center={[9.0, 8.0]}
-                zoom={6}
+                zoom={isMobile ? 5 : 6}
                 style={{ height: '100%', width: '100%' }}
-                zoomControl={true}
+                zoomControl={!isMobile}
                 scrollWheelZoom={false}
               >
                 <TileLayer
@@ -124,7 +173,7 @@ export default function OverviewPage({ onZoneClick }) {
                             {Math.round((count / stats.high_priority_count) * 100)}% of national high priority
                           </div>
                           <div style={{ color: C.gold, fontSize: 10, marginTop: 6 }}>
-                            ◈ Click to view all farmers in this zone
+                            ◈ {isMobile ? 'Tap' : 'Click'} to view all farmers in this zone
                           </div>
                         </div>
                       </Popup>
@@ -135,8 +184,8 @@ export default function OverviewPage({ onZoneClick }) {
             </div>
 
             {/* Legend */}
-            <div style={{ display: 'flex', gap: 24, marginTop: 12 }}>
-              {[['HIGH PRIORITY', C.high], ['MEDIUM', C.mid], ['LOW PRIORITY', C.low]].map(([l, c]) => (
+            <div style={{ display: 'flex', gap: isMobile ? 12 : 24, marginTop: 10, flexWrap: 'wrap' }}>
+              {[['HIGH', C.high], ['MEDIUM', C.mid], ['LOW', C.low]].map(([l, c]) => (
                 <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: c }}/>
                   <span style={{ fontSize: 10, color: c, letterSpacing: 1, fontWeight: 'bold' }}>{l}</span>
@@ -145,45 +194,15 @@ export default function OverviewPage({ onZoneClick }) {
             </div>
           </div>
 
-          {/* Zone Breakdown */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, fontWeight: 'bold' }}>
-              ◈ ZONE BREAKDOWN — CLICK TO VIEW FARMERS
-            </div>
-            {ZONES.map(z => {
-              const count = stats.zones[z.name] || 0;
-              const color = count > 150 ? C.high : count > 80 ? C.mid : C.low;
-              const pct   = Math.round((count / stats.high_priority_count) * 100);
-              return (
-                <div key={z.name}
-                  onClick={() => handleZoneClick(z.name)}
-                  style={{
-                    background: selected === z.name ? `${color}15` : 'rgba(27,67,50,0.2)',
-                    border: `1px solid ${selected === z.name ? color : color+'40'}`,
-                    borderRadius: 8, padding: '12px 16px',
-                    cursor: 'pointer', transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, color: C.text, fontWeight: 'bold' }}>
-                      {z.name.toUpperCase()}
-                    </span>
-                    <span style={{ fontSize: 14, fontWeight: 'bold', color }}>{count}</span>
-                  </div>
-                  <div style={{ height: 4, background: '#1B4332', borderRadius: 2 }}>
-                    <div style={{
-                      height: '100%', width: `${pct}%`,
-                      background: color, borderRadius: 2, transition: 'width 1s ease'
-                    }}/>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                    <span style={{ fontSize: 9, color: C.dim }}>{pct}% of high priority</span>
-                    <span style={{ fontSize: 9, color: C.gold }}>VIEW FARMERS →</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* On desktop: show zone list on the right */}
+          {!isMobile && (
+            <ZoneList
+              zones={ZONES}
+              stats={stats}
+              selected={selected}
+              onZoneClick={handleZoneClick}
+            />
+          )}
         </div>
 
         {/* Selected Zone Banner */}
@@ -194,7 +213,7 @@ export default function OverviewPage({ onZoneClick }) {
             padding: '14px 20px', display: 'flex',
             justifyContent: 'space-between', alignItems: 'center'
           }}>
-            <span style={{ color: C.gold, fontSize: 13, fontWeight: 'bold' }}>
+            <span style={{ color: C.gold, fontSize: isMobile ? 11 : 13, fontWeight: 'bold' }}>
               ◈ NAVIGATING TO {selected.toUpperCase()} — {stats.zones[selected] || 0} HIGH PRIORITY FARMERS
             </span>
             <button onClick={() => setSelected(null)} style={{
@@ -215,6 +234,50 @@ export default function OverviewPage({ onZoneClick }) {
         }
         .leaflet-popup-tip { background: #060D0A !important; }
       `}</style>
+    </div>
+  );
+}
+
+// Extracted zone list component — used in both mobile and desktop
+function ZoneList({ zones, stats, selected, onZoneClick }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ color: '#F59E0B', fontSize: 10, letterSpacing: 2, fontWeight: 'bold' }}>
+        ◈ ZONE BREAKDOWN — CLICK TO VIEW FARMERS
+      </div>
+      {zones.map(z => {
+        const count = stats.zones[z.name] || 0;
+        const color = count > 150 ? '#E24B4A' : count > 80 ? '#EF9F27' : '#639922';
+        const pct   = Math.round((count / stats.high_priority_count) * 100);
+        return (
+          <div key={z.name}
+            onClick={() => onZoneClick(z.name)}
+            style={{
+              background: selected === z.name ? `${color}15` : 'rgba(27,67,50,0.2)',
+              border: `1px solid ${selected === z.name ? color : color+'40'}`,
+              borderRadius: 8, padding: '12px 16px',
+              cursor: 'pointer', transition: 'all 0.2s'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: '#E8F5E9', fontWeight: 'bold' }}>
+                {z.name.toUpperCase()}
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 'bold', color }}>{count}</span>
+            </div>
+            <div style={{ height: 4, background: '#1B4332', borderRadius: 2 }}>
+              <div style={{
+                height: '100%', width: `${pct}%`,
+                background: color, borderRadius: 2, transition: 'width 1s ease'
+              }}/>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ fontSize: 9, color: '#4CAF50' }}>{pct}% of high priority</span>
+              <span style={{ fontSize: 9, color: '#F59E0B' }}>VIEW FARMERS →</span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

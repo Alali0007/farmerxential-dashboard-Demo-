@@ -46,6 +46,16 @@ const INTERVENTION_TYPES = [
   { value: 'other',                label: 'Other' },
 ];
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
 function PriorityBadge({ level }) {
   const map = {
     2: { label: 'HIGH', color: C.high },
@@ -75,7 +85,7 @@ function FilterBtn({ label, active, onClick }) {
   );
 }
 
-function FarmerDetailPanel({ farmer, onClose }) {
+function FarmerDetailPanel({ farmer, onClose, isMobile }) {
   const [showForm, setShowForm]                   = useState(false);
   const [formData, setFormData]                   = useState({
     officer_name: '', intervention_type: 'extension_visit', notes: ''
@@ -141,8 +151,6 @@ function FarmerDetailPanel({ farmer, onClose }) {
     }
   };
 
-  // Update intervention outcome
-  // Think of it like: officer comes back and ticks what happened
   const handleOutcomeChange = async (interventionId, newOutcome) => {
     try {
       await updateIntervention(interventionId, { outcome: newOutcome });
@@ -165,14 +173,22 @@ function FarmerDetailPanel({ farmer, onClose }) {
     return C.dim;
   };
 
+  // Mobile: full screen panel. Desktop: side panel
+  const panelStyle = isMobile ? {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: '#060D0A', borderTop: `3px solid ${color}`,
+    zIndex: 1000, overflowY: 'auto', padding: 16,
+    fontFamily: 'monospace', color: C.text
+  } : {
+    position: 'fixed', top: 0, right: 0, bottom: 0, width: 380,
+    background: '#060D0A', borderLeft: `2px solid ${color}`,
+    zIndex: 1000, overflowY: 'auto', padding: 24,
+    fontFamily: 'monospace', color: C.text,
+    boxShadow: `-8px 0 40px ${color}22`
+  };
+
   return (
-    <div style={{
-      position: 'fixed', top: 0, right: 0, bottom: 0, width: 380,
-      background: '#060D0A', borderLeft: `2px solid ${color}`,
-      zIndex: 1000, overflowY: 'auto', padding: 24,
-      fontFamily: 'monospace', color: C.text,
-      boxShadow: `-8px 0 40px ${color}22`
-    }}>
+    <div style={panelStyle}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
@@ -181,8 +197,8 @@ function FarmerDetailPanel({ farmer, onClose }) {
         </div>
         <button onClick={onClose} style={{
           background: 'transparent', border: `1px solid ${C.dim}`,
-          color: C.dim, width: 32, height: 32, borderRadius: 4,
-          cursor: 'pointer', fontFamily: 'monospace', fontSize: 16
+          color: C.dim, width: 40, height: 40, borderRadius: 4,
+          cursor: 'pointer', fontFamily: 'monospace', fontSize: 18
         }}>✕</button>
       </div>
 
@@ -287,8 +303,8 @@ function FarmerDetailPanel({ farmer, onClose }) {
         {!showForm && (
           <button onClick={() => { setShowForm(true); setSubmitStatus(null); }} style={{
             background: 'rgba(27,67,50,0.4)', border: `1px solid ${C.dim}`,
-            color: C.dim, padding: '10px 16px', borderRadius: 6,
-            fontFamily: 'monospace', fontSize: 11, cursor: 'pointer',
+            color: C.dim, padding: '12px 16px', borderRadius: 6,
+            fontFamily: 'monospace', fontSize: 12, cursor: 'pointer',
             width: '100%', letterSpacing: 1
           }}>+ RECORD NEW INTERVENTION</button>
         )}
@@ -304,8 +320,8 @@ function FarmerDetailPanel({ farmer, onClose }) {
                 style={{
                   width: '100%', background: 'rgba(27,67,50,0.2)',
                   border: `1px solid #1B4332`, borderRadius: 6,
-                  padding: '8px 12px', color: C.text,
-                  fontFamily: 'monospace', fontSize: 12,
+                  padding: '10px 12px', color: C.text,
+                  fontFamily: 'monospace', fontSize: 14,
                   outline: 'none', boxSizing: 'border-box'
                 }}
               />
@@ -318,8 +334,8 @@ function FarmerDetailPanel({ farmer, onClose }) {
                 style={{
                   width: '100%', background: '#060D0A',
                   border: `1px solid #1B4332`, borderRadius: 6,
-                  padding: '8px 12px', color: C.text,
-                  fontFamily: 'monospace', fontSize: 12,
+                  padding: '10px 12px', color: C.text,
+                  fontFamily: 'monospace', fontSize: 14,
                   outline: 'none', boxSizing: 'border-box', cursor: 'pointer'
                 }}
               >
@@ -338,8 +354,8 @@ function FarmerDetailPanel({ farmer, onClose }) {
                 style={{
                   width: '100%', background: 'rgba(27,67,50,0.2)',
                   border: `1px solid #1B4332`, borderRadius: 6,
-                  padding: '8px 12px', color: C.text,
-                  fontFamily: 'monospace', fontSize: 12,
+                  padding: '10px 12px', color: C.text,
+                  fontFamily: 'monospace', fontSize: 14,
                   outline: 'none', resize: 'vertical', boxSizing: 'border-box'
                 }}
               />
@@ -347,14 +363,14 @@ function FarmerDetailPanel({ farmer, onClose }) {
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={handleSubmit} disabled={submitting} style={{
                 flex: 1, background: submitting ? 'rgba(27,67,50,0.3)' : 'rgba(27,67,50,0.6)',
-                border: `1px solid ${C.dim}`, color: C.dim, padding: '10px 0',
-                borderRadius: 6, fontFamily: 'monospace', fontSize: 11,
+                border: `1px solid ${C.dim}`, color: C.dim, padding: '12px 0',
+                borderRadius: 6, fontFamily: 'monospace', fontSize: 12,
                 cursor: submitting ? 'not-allowed' : 'pointer', letterSpacing: 1
               }}>{submitting ? 'SAVING...' : '✓ SUBMIT'}</button>
               <button onClick={() => { setShowForm(false); setSubmitStatus(null); }} style={{
                 background: 'transparent', border: '1px solid #1B4332',
-                color: '#1B4332', padding: '10px 16px', borderRadius: 6,
-                fontFamily: 'monospace', fontSize: 11, cursor: 'pointer'
+                color: '#1B4332', padding: '12px 16px', borderRadius: 6,
+                fontFamily: 'monospace', fontSize: 12, cursor: 'pointer'
               }}>CANCEL</button>
             </div>
           </div>
@@ -390,10 +406,6 @@ function FarmerDetailPanel({ farmer, onClose }) {
               <span style={{ color: C.text, fontSize: 11, fontWeight: 'bold' }}>
                 {INTERVENTION_TYPES.find(t => t.value === iv.intervention_type)?.label || iv.intervention_type}
               </span>
-
-              {/* Outcome dropdown */}
-              {/* Officer can change pending → successful → no_response → follow_up_needed */}
-              {/* Think of it like: ticking what happened after the visit */}
               <select
                 value={iv.outcome}
                 onChange={e => handleOutcomeChange(iv.id, e.target.value)}
@@ -412,7 +424,6 @@ function FarmerDetailPanel({ farmer, onClose }) {
                 <option value="follow_up_needed">FOLLOW UP</option>
               </select>
             </div>
-
             <div style={{ color: C.dim, fontSize: 10 }}>
               {iv.officer_name} · {formatDate(iv.created_at)}
             </div>
@@ -429,6 +440,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
 }
 
 export default function FarmersPage({ onLoadingChange }) {
+  const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const initialZone = searchParams.get('zone') !== null
     ? parseInt(searchParams.get('zone'))
@@ -472,12 +484,13 @@ export default function FarmersPage({ onLoadingChange }) {
   const currentPage = Math.floor(offset / LIMIT) + 1;
 
   return (
-    <div style={{ padding: 24, color: C.text, fontFamily: 'monospace' }}>
+    <div style={{ padding: isMobile ? 12 : 24, color: C.text, fontFamily: 'monospace' }}>
       <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2, marginBottom: 16, fontWeight: 'bold' }}>
         ◈ FARMER INTELLIGENCE DATABASE
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+      {/* Priority Filters */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
         <span style={{ color: C.dim, fontSize: 10, fontWeight: 'bold' }}>PRIORITY:</span>
         <FilterBtn label="ALL"    active={priority === null} onClick={() => changePriority(null)}/>
         <FilterBtn label="HIGH"   active={priority === 2}    onClick={() => changePriority(2)}/>
@@ -485,20 +498,22 @@ export default function FarmersPage({ onLoadingChange }) {
         <FilterBtn label="LOW"    active={priority === 0}    onClick={() => changePriority(0)}/>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
+      {/* Zone Filters */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
         <span style={{ color: C.dim, fontSize: 10, fontWeight: 'bold' }}>ZONE:</span>
-        <FilterBtn label="ALL ZONES" active={zone === null} onClick={() => changeZone(null)}/>
+        <FilterBtn label="ALL" active={zone === null} onClick={() => changeZone(null)}/>
         {[0,1,2,3,4,5].map(z => (
           <FilterBtn key={z} label={ZONE_NAMES[z]} active={zone === z} onClick={() => changeZone(z)}/>
         ))}
         {zone !== null && (
-          <span style={{ color: C.gold, fontSize: 10, marginLeft: 8, fontWeight: 'bold' }}>
-            ◈ VIEWING: {ZONE_FULL[zone].toUpperCase()}
+          <span style={{ color: C.gold, fontSize: 10, marginLeft: 4, fontWeight: 'bold' }}>
+            ◈ {ZONE_FULL[zone].toUpperCase()}
           </span>
         )}
       </div>
 
-      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Search */}
+      <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
         <input
           placeholder="🔍  Search by HHID..."
           value={search}
@@ -507,7 +522,8 @@ export default function FarmersPage({ onLoadingChange }) {
             background: 'rgba(27,67,50,0.2)',
             border: `1px solid ${search ? C.gold : '#1B4332'}`,
             borderRadius: 6, padding: '8px 14px', color: C.text,
-            fontFamily: 'monospace', fontSize: 12, outline: 'none', width: 220
+            fontFamily: 'monospace', fontSize: 12, outline: 'none',
+            width: isMobile ? '100%' : 220
           }}
         />
         {search && (
@@ -516,11 +532,6 @@ export default function FarmersPage({ onLoadingChange }) {
             color: C.dim, padding: '6px 12px', borderRadius: 4,
             fontFamily: 'monospace', fontSize: 10, cursor: 'pointer'
           }}>CLEAR</button>
-        )}
-        {search && (
-          <span style={{ color: C.dim, fontSize: 10 }}>
-            {filteredFarmers.length} RESULT{filteredFarmers.length !== 1 ? 'S' : ''} FOUND
-          </span>
         )}
       </div>
 
@@ -533,64 +544,104 @@ export default function FarmersPage({ onLoadingChange }) {
       {data && <>
         <div style={{ color: C.dim, fontSize: 10, marginBottom: 12, fontWeight: 'bold' }}>
           {search
-            ? `SEARCH RESULTS FOR "${search}"`
+            ? `RESULTS FOR "${search}" — ${filteredFarmers.length} FOUND`
             : `SHOWING ${offset + 1}–${Math.min(offset + LIMIT, data.total)} OF ${data.total} RECORDS`
           }
-          &nbsp;—&nbsp;
-          <span style={{ color: C.gold }}>CLICK ANY ROW TO VIEW FULL PROFILE</span>
+          {!isMobile && <>&nbsp;—&nbsp;<span style={{ color: C.gold }}>CLICK ROW TO VIEW PROFILE</span></>}
         </div>
 
-        <div style={{
-          background: 'rgba(27,67,50,0.1)', border: '1px solid #1B4332',
-          borderRadius: 8, overflow: 'hidden'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '80px 110px 90px 90px 130px 110px 90px',
-            padding: '10px 16px', borderBottom: '1px solid #1B4332',
-            fontSize: 9, color: C.dim, letterSpacing: 1,
-            background: 'rgba(27,67,50,0.3)', fontWeight: 'bold'
-          }}>
-            <span>HHID</span><span>PRIORITY</span><span>RISK %</span>
-            <span>YIELD</span><span>ZONE</span><span>EDUCATION</span><span>SHOCK</span>
+        {/* MOBILE: Card view */}
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {filteredFarmers.length === 0 && !loading && (
+              <div style={{ padding: 40, textAlign: 'center', color: C.dim, fontSize: 12 }}>
+                {search ? `NO FARMERS FOUND MATCHING "${search}"` : 'NO DATA AVAILABLE'}
+              </div>
+            )}
+            {filteredFarmers.map(f => {
+              const color = f.predicted_intervention_level === 2 ? C.high
+                : f.predicted_intervention_level === 1 ? C.mid : C.low;
+              return (
+                <div key={f.hhid} onClick={() => setSelected(f)} style={{
+                  background: 'rgba(27,67,50,0.1)',
+                  border: `1px solid ${color}44`,
+                  borderLeft: `4px solid ${color}`,
+                  borderRadius: 8, padding: 14, cursor: 'pointer'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: C.gold, fontWeight: 'bold', fontSize: 14 }}>HHID {f.hhid}</span>
+                    <PriorityBadge level={f.predicted_intervention_level}/>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                    <span style={{ color: C.dim }}>{f.zone_name || ZONE_FULL[f.zone]}</span>
+                    <span style={{ color, fontWeight: 'bold' }}>{f.risk_score}% RISK</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 10, color: C.dim }}>
+                    <span>YIELD: {Number(f.yield_original).toFixed(1)}</span>
+                    <span style={{ color: f.shock_level > 0 ? C.high : C.dim }}>
+                      SHOCK: {f.shock_level > 0 ? '⚠ YES' : 'NO'}
+                    </span>
+                    <span style={{ color: C.gold, fontSize: 10 }}>TAP FOR PROFILE →</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
-          {filteredFarmers.length === 0 && !loading && (
-            <div style={{ padding: 40, textAlign: 'center', color: C.dim, fontSize: 12 }}>
-              {search ? `NO FARMERS FOUND MATCHING "${search}"` : 'NO DATA AVAILABLE'}
-            </div>
-          )}
-
-          {filteredFarmers.map((f, i) => (
-            <div key={f.hhid} onClick={() => setSelected(f)} style={{
+        ) : (
+          // DESKTOP: Table view
+          <div style={{
+            background: 'rgba(27,67,50,0.1)', border: '1px solid #1B4332',
+            borderRadius: 8, overflow: 'hidden'
+          }}>
+            <div style={{
               display: 'grid',
               gridTemplateColumns: '80px 110px 90px 90px 130px 110px 90px',
-              padding: '10px 16px', borderBottom: '1px solid rgba(27,67,50,0.4)',
-              background: selected?.hhid === f.hhid
-                ? 'rgba(245,158,11,0.08)'
-                : i % 2 === 0 ? 'transparent' : 'rgba(27,67,50,0.08)',
-              fontSize: 12, alignItems: 'center', cursor: 'pointer',
-              borderLeft: selected?.hhid === f.hhid ? `3px solid ${C.gold}` : '3px solid transparent',
-              transition: 'background 0.15s'
+              padding: '10px 16px', borderBottom: '1px solid #1B4332',
+              fontSize: 9, color: C.dim, letterSpacing: 1,
+              background: 'rgba(27,67,50,0.3)', fontWeight: 'bold'
             }}>
-              <span style={{ color: C.gold, fontWeight: 'bold' }}>{f.hhid}</span>
-              <span><PriorityBadge level={f.predicted_intervention_level}/></span>
-              <span style={{
-                color: f.risk_score > 60 ? C.high : f.risk_score > 30 ? C.mid : C.low,
-                fontWeight: 'bold'
-              }}>{f.risk_score}%</span>
-              <span style={{ color: C.text }}>{Number(f.yield_original).toFixed(1)}</span>
-              <span style={{ color: C.dim }}>{f.zone_name || ZONE_FULL[f.zone] || ZONE_NAMES[f.zone]}</span>
-              <span style={{ color: C.text }}>{f.household_max_education}</span>
-              <span style={{ color: f.shock_level > 0 ? C.high : C.dim, fontWeight: 'bold' }}>
-                {f.shock_level > 0 ? '⚠ YES' : 'NONE'}
-              </span>
+              <span>HHID</span><span>PRIORITY</span><span>RISK %</span>
+              <span>YIELD</span><span>ZONE</span><span>EDUCATION</span><span>SHOCK</span>
             </div>
-          ))}
-        </div>
 
+            {filteredFarmers.length === 0 && !loading && (
+              <div style={{ padding: 40, textAlign: 'center', color: C.dim, fontSize: 12 }}>
+                {search ? `NO FARMERS FOUND MATCHING "${search}"` : 'NO DATA AVAILABLE'}
+              </div>
+            )}
+
+            {filteredFarmers.map((f, i) => (
+              <div key={f.hhid} onClick={() => setSelected(f)} style={{
+                display: 'grid',
+                gridTemplateColumns: '80px 110px 90px 90px 130px 110px 90px',
+                padding: '10px 16px', borderBottom: '1px solid rgba(27,67,50,0.4)',
+                background: selected?.hhid === f.hhid
+                  ? 'rgba(245,158,11,0.08)'
+                  : i % 2 === 0 ? 'transparent' : 'rgba(27,67,50,0.08)',
+                fontSize: 12, alignItems: 'center', cursor: 'pointer',
+                borderLeft: selected?.hhid === f.hhid ? `3px solid ${C.gold}` : '3px solid transparent',
+                transition: 'background 0.15s'
+              }}>
+                <span style={{ color: C.gold, fontWeight: 'bold' }}>{f.hhid}</span>
+                <span><PriorityBadge level={f.predicted_intervention_level}/></span>
+                <span style={{
+                  color: f.risk_score > 60 ? C.high : f.risk_score > 30 ? C.mid : C.low,
+                  fontWeight: 'bold'
+                }}>{f.risk_score}%</span>
+                <span style={{ color: C.text }}>{Number(f.yield_original).toFixed(1)}</span>
+                <span style={{ color: C.dim }}>{f.zone_name || ZONE_FULL[f.zone] || ZONE_NAMES[f.zone]}</span>
+                <span style={{ color: C.text }}>{f.household_max_education}</span>
+                <span style={{ color: f.shock_level > 0 ? C.high : C.dim, fontWeight: 'bold' }}>
+                  {f.shock_level > 0 ? '⚠ YES' : 'NONE'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
         {!search && (
-          <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={goPrev} disabled={offset === 0} style={{
               background: 'transparent',
               border: `1px solid ${offset === 0 ? '#1B4332' : C.dim}`,
@@ -600,22 +651,26 @@ export default function FarmersPage({ onLoadingChange }) {
               cursor: offset === 0 ? 'not-allowed' : 'pointer'
             }}>← PREV</button>
 
-            <div style={{ display: 'flex', gap: 4 }}>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pageNum = Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i;
-                return (
-                  <button key={pageNum} onClick={() => setOffset((pageNum - 1) * LIMIT)} style={{
-                    background: currentPage === pageNum ? 'rgba(245,158,11,0.2)' : 'transparent',
-                    border: currentPage === pageNum ? `1px solid ${C.gold}` : '1px solid #1B4332',
-                    color: currentPage === pageNum ? C.gold : C.dim,
-                    width: 32, height: 32, borderRadius: 4,
-                    fontFamily: 'monospace', fontSize: 10, cursor: 'pointer'
-                  }}>{pageNum}</button>
-                );
-              })}
-            </div>
+            {!isMobile && (
+              <div style={{ display: 'flex', gap: 4 }}>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i;
+                  return (
+                    <button key={pageNum} onClick={() => setOffset((pageNum - 1) * LIMIT)} style={{
+                      background: currentPage === pageNum ? 'rgba(245,158,11,0.2)' : 'transparent',
+                      border: currentPage === pageNum ? `1px solid ${C.gold}` : '1px solid #1B4332',
+                      color: currentPage === pageNum ? C.gold : C.dim,
+                      width: 32, height: 32, borderRadius: 4,
+                      fontFamily: 'monospace', fontSize: 10, cursor: 'pointer'
+                    }}>{pageNum}</button>
+                  );
+                })}
+              </div>
+            )}
 
-            <span style={{ color: C.dim, fontSize: 10 }}>PAGE {currentPage} OF {totalPages}</span>
+            <span style={{ color: C.dim, fontSize: 10 }}>
+              PAGE {currentPage} OF {totalPages}
+            </span>
 
             <button onClick={goNext} disabled={offset + LIMIT >= data.total} style={{
               background: 'transparent',
@@ -629,9 +684,10 @@ export default function FarmersPage({ onLoadingChange }) {
         )}
       </>}
 
-      <FarmerDetailPanel farmer={selected} onClose={() => setSelected(null)}/>
+      <FarmerDetailPanel farmer={selected} onClose={() => setSelected(null)} isMobile={isMobile}/>
 
-      {selected && (
+      {/* Overlay — desktop only. On mobile the panel is full screen so no overlay needed */}
+      {selected && !isMobile && (
         <div onClick={() => setSelected(null)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999
         }}/>
