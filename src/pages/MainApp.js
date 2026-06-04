@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import OverviewPage from './OverviewPage';
 import FarmersPage from './FarmersPage';
@@ -13,17 +14,40 @@ const ZONE_NUMBER = {
 };
 
 export default function MainApp({ onLogout }) {
-  const [page, setPage]             = useState('OVERVIEW');
-  const [zoneFilter, setZoneFilter] = useState(null);
+  // useNavigate is like a GPS — it lets us change the URL programmatically
+  // Think of it like: calling navigate('/farmers') is like clicking a link
+  const navigate = useNavigate();
 
+  // useLocation reads the current URL
+  // We use it to tell the Navbar which page is active
+  const location = useLocation();
+
+  // When someone clicks a zone on the map, go to /farmers?zone=2
+  // The zone number is now stored IN THE URL, not in useState
   const goToZone = (zoneName) => {
-    setZoneFilter(ZONE_NUMBER[zoneName] ?? null);
-    setPage('FARMERS');
+    const zoneNumber = ZONE_NUMBER[zoneName] ?? null;
+    if (zoneNumber !== null) {
+      navigate(`/farmers?zone=${zoneNumber}`);
+    } else {
+      navigate('/farmers');
+    }
   };
 
+  // Work out which page is active from the URL
+  // This tells the Navbar which button to highlight
+  const getActivePage = () => {
+    if (location.pathname === '/farmers') return 'FARMERS';
+    if (location.pathname === '/alerts')  return 'ALERTS';
+    if (location.pathname === '/predict') return 'PREDICT';
+    return 'OVERVIEW';
+  };
+
+  // When navbar button is clicked, navigate to the right URL
   const handleSetPage = (newPage) => {
-    if (newPage !== 'FARMERS') setZoneFilter(null);
-    setPage(newPage);
+    if (newPage === 'OVERVIEW') navigate('/');
+    if (newPage === 'FARMERS')  navigate('/farmers');
+    if (newPage === 'ALERTS')   navigate('/alerts');
+    if (newPage === 'PREDICT')  navigate('/predict');
   };
 
   return (
@@ -36,11 +60,16 @@ export default function MainApp({ onLogout }) {
       `,
       backgroundSize: '40px 40px'
     }}>
-      <Navbar page={page} setPage={handleSetPage} onLogout={onLogout}/>
-      {page === 'OVERVIEW' && <OverviewPage onZoneClick={goToZone}/>}
-      {page === 'FARMERS'  && <FarmersPage key={zoneFilter} initialZone={zoneFilter}/>}
-      {page === 'ALERTS'   && <AlertsPage/>}
-      {page === 'PREDICT'  && <PredictPage/>}
+      <Navbar page={getActivePage()} setPage={handleSetPage} onLogout={onLogout}/>
+
+      {/* Routes is like a switchboard — it looks at the URL and renders the right page */}
+      {/* Think of each Route as: "if the URL is X, show Y" */}
+      <Routes>
+        <Route path="/"        element={<OverviewPage onZoneClick={goToZone}/>}/>
+        <Route path="/farmers" element={<FarmersPage/>}/>
+        <Route path="/alerts"  element={<AlertsPage/>}/>
+        <Route path="/predict" element={<PredictPage/>}/>
+      </Routes>
     </div>
   );
 }

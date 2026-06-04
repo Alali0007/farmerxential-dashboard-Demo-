@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getFarmers, createIntervention, getFarmerInterventions } from '../api/farmerxential';
 
 const C = {
@@ -34,8 +35,6 @@ const RECOMMENDATIONS = {
   transport_cost:            'Reduce transport barriers through local market access',
 };
 
-// These are the types of help a field officer can give
-// Think of it like a dropdown menu on a paper form
 const INTERVENTION_TYPES = [
   { value: 'extension_visit',      label: 'Extension Officer Visit' },
   { value: 'fertilizer_support',   label: 'Fertilizer Support' },
@@ -77,32 +76,20 @@ function FilterBtn({ label, active, onClick }) {
 }
 
 function FarmerDetailPanel({ farmer, onClose }) {
-  // ── Intervention form state ──
-  // showForm: is the form visible?
-  // formData: what the officer is typing
-  // submitting: is the API call in progress?
-  // submitStatus: 'success' or 'error' message to show after submit
-  // pastInterventions: previous visits for this farmer
-  const [showForm, setShowForm]               = useState(false);
-  const [formData, setFormData]               = useState({
-    officer_name: '',
-    intervention_type: 'extension_visit',
-    notes: ''
+  const [showForm, setShowForm]                   = useState(false);
+  const [formData, setFormData]                   = useState({
+    officer_name: '', intervention_type: 'extension_visit', notes: ''
   });
-  const [submitting, setSubmitting]           = useState(false);
-  const [submitStatus, setSubmitStatus]       = useState(null); // null | 'success' | 'error'
+  const [submitting, setSubmitting]               = useState(false);
+  const [submitStatus, setSubmitStatus]           = useState(null);
   const [pastInterventions, setPastInterventions] = useState([]);
-  const [loadingHistory, setLoadingHistory]   = useState(false);
+  const [loadingHistory, setLoadingHistory]       = useState(false);
 
-  // Every time a new farmer is selected, reset the form and load their history
   useEffect(() => {
     if (!farmer) return;
     setShowForm(false);
     setFormData({ officer_name: '', intervention_type: 'extension_visit', notes: '' });
     setSubmitStatus(null);
-
-    // Load past interventions for this farmer
-    // Think of it like: opening their visit history file
     setLoadingHistory(true);
     getFarmerInterventions(farmer.hhid)
       .then(d => { setPastInterventions(d.interventions || []); setLoadingHistory(false); })
@@ -130,18 +117,10 @@ function FarmerDetailPanel({ farmer, onClose }) {
 
   const assetLabel = Number(farmer.asset_score) < 0 ? 'Low' : Number(farmer.asset_score) < 1 ? 'Medium' : 'High';
 
-  // Handle form submission
-  // Think of it like: pressing SEND on the form
   const handleSubmit = async () => {
-    // Basic validation — officer name is required
-    if (!formData.officer_name.trim()) {
-      setSubmitStatus('error');
-      return;
-    }
-
+    if (!formData.officer_name.trim()) { setSubmitStatus('error'); return; }
     setSubmitting(true);
     setSubmitStatus(null);
-
     try {
       await createIntervention({
         farmer_id: farmer.hhid,
@@ -150,17 +129,11 @@ function FarmerDetailPanel({ farmer, onClose }) {
         notes: formData.notes.trim() || null,
         risk_score_at_intervention: farmer.risk_score
       });
-
       setSubmitStatus('success');
       setShowForm(false);
-
-      // Reload past interventions to show the new one
       const updated = await getFarmerInterventions(farmer.hhid);
       setPastInterventions(updated.interventions || []);
-
-      // Reset form for next use
       setFormData({ officer_name: '', intervention_type: 'extension_visit', notes: '' });
-
     } catch (err) {
       setSubmitStatus('error');
     } finally {
@@ -168,18 +141,16 @@ function FarmerDetailPanel({ farmer, onClose }) {
     }
   };
 
-  // Format date simply — e.g. "2 Jun 2026"
   const formatDate = (isoString) => {
     const d = new Date(isoString);
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  // Outcome colour — green for success, red for no response, gold for pending
   const outcomeColor = (outcome) => {
     if (outcome === 'successful')       return C.low;
     if (outcome === 'no_response')      return C.high;
     if (outcome === 'follow_up_needed') return C.mid;
-    return C.dim; // pending
+    return C.dim;
   };
 
   return (
@@ -190,13 +161,10 @@ function FarmerDetailPanel({ farmer, onClose }) {
       fontFamily: 'monospace', color: C.text,
       boxShadow: `-8px 0 40px ${color}22`
     }}>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <div style={{ color: C.gold, fontSize: 18, fontWeight: 'bold' }}>HHID {farmer.hhid}</div>
-          <div style={{ color: C.dim, fontSize: 10, letterSpacing: 1, marginTop: 2 }}>
-            FARMER INTELLIGENCE PROFILE
-          </div>
+          <div style={{ color: C.dim, fontSize: 10, letterSpacing: 1, marginTop: 2 }}>FARMER INTELLIGENCE PROFILE</div>
         </div>
         <button onClick={onClose} style={{
           background: 'transparent', border: `1px solid ${C.dim}`,
@@ -205,29 +173,22 @@ function FarmerDetailPanel({ farmer, onClose }) {
         }}>✕</button>
       </div>
 
-      {/* Priority */}
       <div style={{
         background: `${color}11`, border: `2px solid ${color}`,
-        borderRadius: 10, padding: '16px 20px',
-        textAlign: 'center', marginBottom: 16
+        borderRadius: 10, padding: '16px 20px', textAlign: 'center', marginBottom: 16
       }}>
         <div style={{ color, fontSize: 20, fontWeight: 'bold' }}>{priorityLabel}</div>
-        <div style={{ color, fontSize: 26, fontWeight: 'bold', marginTop: 4 }}>
-          {farmer.risk_score}% RISK
-        </div>
+        <div style={{ color, fontSize: 26, fontWeight: 'bold', marginTop: 4 }}>{farmer.risk_score}% RISK</div>
         <div style={{ height: 6, background: '#1B4332', borderRadius: 3, marginTop: 10 }}>
           <div style={{ height: '100%', width: `${farmer.risk_score}%`, background: color, borderRadius: 3 }}/>
         </div>
       </div>
 
-      {/* Farm Details */}
       <div style={{
         background: 'rgba(27,67,50,0.2)', border: '1px solid #1B4332',
         borderRadius: 8, padding: 16, marginBottom: 16
       }}>
-        <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 12, fontWeight: 'bold' }}>
-          FARM DETAILS
-        </div>
+        <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 12, fontWeight: 'bold' }}>FARM DETAILS</div>
         {[
           ['Zone',             farmer.zone_name || ZONE_FULL[farmer.zone]],
           ['Crop Yield',       Number(farmer.yield_original).toFixed(2)],
@@ -249,11 +210,9 @@ function FarmerDetailPanel({ farmer, onClose }) {
         ))}
       </div>
 
-      {/* Why at risk */}
       {reasons.length > 0 && (
         <div style={{
-          background: 'rgba(226,75,74,0.06)',
-          border: '1px solid rgba(226,75,74,0.3)',
+          background: 'rgba(226,75,74,0.06)', border: '1px solid rgba(226,75,74,0.3)',
           borderRadius: 8, padding: 16, marginBottom: 16
         }}>
           <div style={{ color: C.high, fontSize: 10, letterSpacing: 2, marginBottom: 10, fontWeight: 'bold' }}>
@@ -268,11 +227,9 @@ function FarmerDetailPanel({ farmer, onClose }) {
         </div>
       )}
 
-      {/* Recommendations */}
       {recommendations.length > 0 && (
         <div style={{
-          background: 'rgba(245,158,11,0.05)',
-          border: `1px solid ${C.gold}40`,
+          background: 'rgba(245,158,11,0.05)', border: `1px solid ${C.gold}40`,
           borderRadius: 8, padding: 16, marginBottom: 16
         }}>
           <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 10, fontWeight: 'bold' }}>
@@ -280,8 +237,7 @@ function FarmerDetailPanel({ farmer, onClose }) {
           </div>
           {recommendations.map((r, i) => (
             <div key={i} style={{
-              display: 'flex', gap: 8, marginBottom: 8,
-              padding: '8px 10px',
+              display: 'flex', gap: 8, marginBottom: 8, padding: '8px 10px',
               background: 'rgba(245,158,11,0.06)', borderRadius: 6
             }}>
               <span style={{ color: C.gold }}>✦</span>
@@ -291,64 +247,38 @@ function FarmerDetailPanel({ farmer, onClose }) {
         </div>
       )}
 
-      {/* ── INTERVENTION SECTION ── */}
-      {/* This is the new section — the "Record Intervention" button and form */}
-      <div style={{
-        border: `1px solid ${C.green}`,
-        borderRadius: 8, padding: 16, marginBottom: 16
-      }}>
+      <div style={{ border: `1px solid ${C.green}`, borderRadius: 8, padding: 16, marginBottom: 16 }}>
         <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 12, fontWeight: 'bold' }}>
           ◈ INTERVENTION TRACKING
         </div>
 
-        {/* Success message — shown after successful submission */}
         {submitStatus === 'success' && (
           <div style={{
             background: 'rgba(99,153,34,0.15)', border: `1px solid ${C.low}`,
-            borderRadius: 6, padding: '10px 14px', marginBottom: 12,
-            color: C.low, fontSize: 12
-          }}>
-            ✓ Intervention recorded successfully
-          </div>
+            borderRadius: 6, padding: '10px 14px', marginBottom: 12, color: C.low, fontSize: 12
+          }}>✓ Intervention recorded successfully</div>
         )}
 
-        {/* Error message */}
         {submitStatus === 'error' && (
           <div style={{
             background: 'rgba(226,75,74,0.1)', border: `1px solid ${C.high}`,
-            borderRadius: 6, padding: '10px 14px', marginBottom: 12,
-            color: C.high, fontSize: 12
-          }}>
-            ✗ Please enter officer name and try again
-          </div>
+            borderRadius: 6, padding: '10px 14px', marginBottom: 12, color: C.high, fontSize: 12
+          }}>✗ Please enter officer name and try again</div>
         )}
 
-        {/* Record button — toggles the form */}
         {!showForm && (
-          <button
-            onClick={() => { setShowForm(true); setSubmitStatus(null); }}
-            style={{
-              background: 'rgba(27,67,50,0.4)',
-              border: `1px solid ${C.dim}`,
-              color: C.dim, padding: '10px 16px',
-              borderRadius: 6, fontFamily: 'monospace',
-              fontSize: 11, cursor: 'pointer',
-              width: '100%', letterSpacing: 1,
-              transition: 'all 0.2s'
-            }}
-          >
-            + RECORD NEW INTERVENTION
-          </button>
+          <button onClick={() => { setShowForm(true); setSubmitStatus(null); }} style={{
+            background: 'rgba(27,67,50,0.4)', border: `1px solid ${C.dim}`,
+            color: C.dim, padding: '10px 16px', borderRadius: 6,
+            fontFamily: 'monospace', fontSize: 11, cursor: 'pointer',
+            width: '100%', letterSpacing: 1
+          }}>+ RECORD NEW INTERVENTION</button>
         )}
 
-        {/* Intervention Form */}
         {showForm && (
           <div>
-            {/* Officer Name */}
             <div style={{ marginBottom: 12 }}>
-              <div style={{ color: C.dim, fontSize: 10, marginBottom: 6, letterSpacing: 1 }}>
-                OFFICER NAME *
-              </div>
+              <div style={{ color: C.dim, fontSize: 10, marginBottom: 6, letterSpacing: 1 }}>OFFICER NAME *</div>
               <input
                 placeholder="Enter your name..."
                 value={formData.officer_name}
@@ -362,12 +292,8 @@ function FarmerDetailPanel({ farmer, onClose }) {
                 }}
               />
             </div>
-
-            {/* Intervention Type */}
             <div style={{ marginBottom: 12 }}>
-              <div style={{ color: C.dim, fontSize: 10, marginBottom: 6, letterSpacing: 1 }}>
-                TYPE OF INTERVENTION *
-              </div>
+              <div style={{ color: C.dim, fontSize: 10, marginBottom: 6, letterSpacing: 1 }}>TYPE OF INTERVENTION *</div>
               <select
                 value={formData.intervention_type}
                 onChange={e => setFormData({ ...formData, intervention_type: e.target.value })}
@@ -384,12 +310,8 @@ function FarmerDetailPanel({ farmer, onClose }) {
                 ))}
               </select>
             </div>
-
-            {/* Notes */}
             <div style={{ marginBottom: 14 }}>
-              <div style={{ color: C.dim, fontSize: 10, marginBottom: 6, letterSpacing: 1 }}>
-                NOTES (OPTIONAL)
-              </div>
+              <div style={{ color: C.dim, fontSize: 10, marginBottom: 6, letterSpacing: 1 }}>NOTES (OPTIONAL)</div>
               <textarea
                 placeholder="Any additional observations..."
                 value={formData.notes}
@@ -400,47 +322,27 @@ function FarmerDetailPanel({ farmer, onClose }) {
                   border: `1px solid #1B4332`, borderRadius: 6,
                   padding: '8px 12px', color: C.text,
                   fontFamily: 'monospace', fontSize: 12,
-                  outline: 'none', resize: 'vertical',
-                  boxSizing: 'border-box'
+                  outline: 'none', resize: 'vertical', boxSizing: 'border-box'
                 }}
               />
             </div>
-
-            {/* Form Buttons */}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                style={{
-                  flex: 1, background: submitting ? 'rgba(27,67,50,0.3)' : 'rgba(27,67,50,0.6)',
-                  border: `1px solid ${C.dim}`,
-                  color: C.dim, padding: '10px 0',
-                  borderRadius: 6, fontFamily: 'monospace',
-                  fontSize: 11, cursor: submitting ? 'not-allowed' : 'pointer',
-                  letterSpacing: 1
-                }}
-              >
-                {submitting ? 'SAVING...' : '✓ SUBMIT'}
-              </button>
-              <button
-                onClick={() => { setShowForm(false); setSubmitStatus(null); }}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #1B4332',
-                  color: '#1B4332', padding: '10px 16px',
-                  borderRadius: 6, fontFamily: 'monospace',
-                  fontSize: 11, cursor: 'pointer'
-                }}
-              >
-                CANCEL
-              </button>
+              <button onClick={handleSubmit} disabled={submitting} style={{
+                flex: 1, background: submitting ? 'rgba(27,67,50,0.3)' : 'rgba(27,67,50,0.6)',
+                border: `1px solid ${C.dim}`, color: C.dim, padding: '10px 0',
+                borderRadius: 6, fontFamily: 'monospace', fontSize: 11,
+                cursor: submitting ? 'not-allowed' : 'pointer', letterSpacing: 1
+              }}>{submitting ? 'SAVING...' : '✓ SUBMIT'}</button>
+              <button onClick={() => { setShowForm(false); setSubmitStatus(null); }} style={{
+                background: 'transparent', border: '1px solid #1B4332',
+                color: '#1B4332', padding: '10px 16px', borderRadius: 6,
+                fontFamily: 'monospace', fontSize: 11, cursor: 'pointer'
+              }}>CANCEL</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── PAST INTERVENTIONS ── */}
-      {/* Shows the history of all previous visits for this farmer */}
       <div style={{
         background: 'rgba(27,67,50,0.1)', border: '1px solid #1B4332',
         borderRadius: 8, padding: 16
@@ -448,19 +350,12 @@ function FarmerDetailPanel({ farmer, onClose }) {
         <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, marginBottom: 12, fontWeight: 'bold' }}>
           ◈ INTERVENTION HISTORY ({pastInterventions.length})
         </div>
-
         {loadingHistory && (
-          <div style={{ color: C.dim, fontSize: 11, textAlign: 'center', padding: 12 }}>
-            LOADING HISTORY...
-          </div>
+          <div style={{ color: C.dim, fontSize: 11, textAlign: 'center', padding: 12 }}>LOADING HISTORY...</div>
         )}
-
         {!loadingHistory && pastInterventions.length === 0 && (
-          <div style={{ color: C.dim, fontSize: 11, textAlign: 'center', padding: 12 }}>
-            No interventions recorded yet
-          </div>
+          <div style={{ color: C.dim, fontSize: 11, textAlign: 'center', padding: 12 }}>No interventions recorded yet</div>
         )}
-
         {!loadingHistory && pastInterventions.map((iv) => (
           <div key={iv.id} style={{
             background: 'rgba(27,67,50,0.2)', borderRadius: 6,
@@ -475,13 +370,9 @@ function FarmerDetailPanel({ farmer, onClose }) {
                 {iv.outcome.toUpperCase().replace('_', ' ')}
               </span>
             </div>
-            <div style={{ color: C.dim, fontSize: 10 }}>
-              {iv.officer_name} · {formatDate(iv.created_at)}
-            </div>
+            <div style={{ color: C.dim, fontSize: 10 }}>{iv.officer_name} · {formatDate(iv.created_at)}</div>
             {iv.notes && (
-              <div style={{ color: C.text, fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>
-                "{iv.notes}"
-              </div>
+              <div style={{ color: C.text, fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>"{iv.notes}"</div>
             )}
           </div>
         ))}
@@ -490,7 +381,14 @@ function FarmerDetailPanel({ farmer, onClose }) {
   );
 }
 
-export default function FarmersPage({ initialZone = null }) {
+export default function FarmersPage() {
+  // Read zone from URL — e.g. /farmers?zone=2
+  // useSearchParams reads the ?zone=2 part of the URL
+  const [searchParams] = useSearchParams();
+  const initialZone = searchParams.get('zone') !== null
+    ? parseInt(searchParams.get('zone'))
+    : null;
+
   const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
   const [zone, setZone]         = useState(initialZone);
@@ -508,37 +406,16 @@ export default function FarmersPage({ initialZone = null }) {
       .catch(() => setLoading(false));
   }, [zone, priority, offset]);
 
-  const changeZone = (newZone) => {
-    setZone(newZone);
-    setOffset(0);
-    setSearch('');
-  };
-
-  const changePriority = (newPriority) => {
-    setPriority(newPriority);
-    setOffset(0);
-    setSearch('');
-  };
-
-  const goNext = () => {
-    if (data && offset + LIMIT < data.total) {
-      setOffset(prev => prev + LIMIT);
-    }
-  };
-
-  const goPrev = () => {
-    if (offset > 0) {
-      setOffset(prev => Math.max(0, prev - LIMIT));
-    }
-  };
+  const changeZone     = (z) => { setZone(z); setOffset(0); setSearch(''); };
+  const changePriority = (p) => { setPriority(p); setOffset(0); setSearch(''); };
+  const goNext = () => { if (data && offset + LIMIT < data.total) setOffset(p => p + LIMIT); };
+  const goPrev = () => { if (offset > 0) setOffset(p => Math.max(0, p - LIMIT)); };
 
   const filteredFarmers = data
-    ? data.farmers.filter(f =>
-        search === '' || String(f.hhid).includes(search.trim())
-      )
+    ? data.farmers.filter(f => search === '' || String(f.hhid).includes(search.trim()))
     : [];
 
-  const totalPages = data ? Math.ceil(data.total / LIMIT) : 0;
+  const totalPages  = data ? Math.ceil(data.total / LIMIT) : 0;
   const currentPage = Math.floor(offset / LIMIT) + 1;
 
   return (
@@ -547,7 +424,6 @@ export default function FarmersPage({ initialZone = null }) {
         ◈ FARMER INTELLIGENCE DATABASE
       </div>
 
-      {/* Priority Filters */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
         <span style={{ color: C.dim, fontSize: 10, fontWeight: 'bold' }}>PRIORITY:</span>
         <FilterBtn label="ALL"    active={priority === null} onClick={() => changePriority(null)}/>
@@ -556,17 +432,11 @@ export default function FarmersPage({ initialZone = null }) {
         <FilterBtn label="LOW"    active={priority === 0}    onClick={() => changePriority(0)}/>
       </div>
 
-      {/* Zone Filters */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
         <span style={{ color: C.dim, fontSize: 10, fontWeight: 'bold' }}>ZONE:</span>
         <FilterBtn label="ALL ZONES" active={zone === null} onClick={() => changeZone(null)}/>
         {[0,1,2,3,4,5].map(z => (
-          <FilterBtn
-            key={z}
-            label={ZONE_NAMES[z]}
-            active={zone === z}
-            onClick={() => changeZone(z)}
-          />
+          <FilterBtn key={z} label={ZONE_NAMES[z]} active={zone === z} onClick={() => changeZone(z)}/>
         ))}
         {zone !== null && (
           <span style={{ color: C.gold, fontSize: 10, marginLeft: 8, fontWeight: 'bold' }}>
@@ -575,7 +445,6 @@ export default function FarmersPage({ initialZone = null }) {
         )}
       </div>
 
-      {/* Search */}
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
         <input
           placeholder="🔍  Search by HHID..."
@@ -584,10 +453,8 @@ export default function FarmersPage({ initialZone = null }) {
           style={{
             background: 'rgba(27,67,50,0.2)',
             border: `1px solid ${search ? C.gold : '#1B4332'}`,
-            borderRadius: 6, padding: '8px 14px',
-            color: C.text, fontFamily: 'monospace',
-            fontSize: 12, outline: 'none', width: 220,
-            transition: 'border 0.2s'
+            borderRadius: 6, padding: '8px 14px', color: C.text,
+            fontFamily: 'monospace', fontSize: 12, outline: 'none', width: 220
           }}
         />
         {search && (
@@ -605,9 +472,7 @@ export default function FarmersPage({ initialZone = null }) {
       </div>
 
       {loading && (
-        <div style={{ color: C.dim, padding: 60, textAlign: 'center', fontSize: 13 }}>
-          SCANNING DATABASE...
-        </div>
+        <div style={{ color: C.dim, padding: 60, textAlign: 'center', fontSize: 13 }}>SCANNING DATABASE...</div>
       )}
 
       {data && <>
@@ -620,12 +485,10 @@ export default function FarmersPage({ initialZone = null }) {
           <span style={{ color: C.gold }}>CLICK ANY ROW TO VIEW FULL PROFILE</span>
         </div>
 
-        {/* Table */}
         <div style={{
           background: 'rgba(27,67,50,0.1)', border: '1px solid #1B4332',
           borderRadius: 8, overflow: 'hidden'
         }}>
-          {/* Header */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: '80px 110px 90px 90px 130px 110px 90px',
@@ -633,13 +496,8 @@ export default function FarmersPage({ initialZone = null }) {
             fontSize: 9, color: C.dim, letterSpacing: 1,
             background: 'rgba(27,67,50,0.3)', fontWeight: 'bold'
           }}>
-            <span>HHID</span>
-            <span>PRIORITY</span>
-            <span>RISK %</span>
-            <span>YIELD</span>
-            <span>ZONE</span>
-            <span>EDUCATION</span>
-            <span>SHOCK</span>
+            <span>HHID</span><span>PRIORITY</span><span>RISK %</span>
+            <span>YIELD</span><span>ZONE</span><span>EDUCATION</span><span>SHOCK</span>
           </div>
 
           {filteredFarmers.length === 0 && !loading && (
@@ -649,32 +507,23 @@ export default function FarmersPage({ initialZone = null }) {
           )}
 
           {filteredFarmers.map((f, i) => (
-            <div key={f.hhid}
-              onClick={() => setSelected(f)}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '80px 110px 90px 90px 130px 110px 90px',
-                padding: '10px 16px',
-                borderBottom: '1px solid rgba(27,67,50,0.4)',
-                background: selected?.hhid === f.hhid
-                  ? 'rgba(245,158,11,0.08)'
-                  : i % 2 === 0 ? 'transparent' : 'rgba(27,67,50,0.08)',
-                fontSize: 12, alignItems: 'center',
-                cursor: 'pointer',
-                borderLeft: selected?.hhid === f.hhid
-                  ? `3px solid ${C.gold}`
-                  : '3px solid transparent',
-                transition: 'background 0.15s'
-              }}
-            >
+            <div key={f.hhid} onClick={() => setSelected(f)} style={{
+              display: 'grid',
+              gridTemplateColumns: '80px 110px 90px 90px 130px 110px 90px',
+              padding: '10px 16px', borderBottom: '1px solid rgba(27,67,50,0.4)',
+              background: selected?.hhid === f.hhid
+                ? 'rgba(245,158,11,0.08)'
+                : i % 2 === 0 ? 'transparent' : 'rgba(27,67,50,0.08)',
+              fontSize: 12, alignItems: 'center', cursor: 'pointer',
+              borderLeft: selected?.hhid === f.hhid ? `3px solid ${C.gold}` : '3px solid transparent',
+              transition: 'background 0.15s'
+            }}>
               <span style={{ color: C.gold, fontWeight: 'bold' }}>{f.hhid}</span>
               <span><PriorityBadge level={f.predicted_intervention_level}/></span>
               <span style={{
                 color: f.risk_score > 60 ? C.high : f.risk_score > 30 ? C.mid : C.low,
                 fontWeight: 'bold'
-              }}>
-                {f.risk_score}%
-              </span>
+              }}>{f.risk_score}%</span>
               <span style={{ color: C.text }}>{Number(f.yield_original).toFixed(1)}</span>
               <span style={{ color: C.dim }}>{f.zone_name || ZONE_FULL[f.zone] || ZONE_NAMES[f.zone]}</span>
               <span style={{ color: C.text }}>{f.household_max_education}</span>
@@ -685,71 +534,52 @@ export default function FarmersPage({ initialZone = null }) {
           ))}
         </div>
 
-        {/* Pagination */}
         {!search && (
           <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: 'center', alignItems: 'center' }}>
-            <button
-              onClick={goPrev}
-              disabled={offset === 0}
-              style={{
-                background: 'transparent',
-                border: `1px solid ${offset === 0 ? '#1B4332' : C.dim}`,
-                color: offset === 0 ? '#1B4332' : C.dim,
-                padding: '6px 16px', borderRadius: 4,
-                fontFamily: 'monospace', fontSize: 10,
-                cursor: offset === 0 ? 'not-allowed' : 'pointer'
-              }}>← PREV</button>
+            <button onClick={goPrev} disabled={offset === 0} style={{
+              background: 'transparent',
+              border: `1px solid ${offset === 0 ? '#1B4332' : C.dim}`,
+              color: offset === 0 ? '#1B4332' : C.dim,
+              padding: '6px 16px', borderRadius: 4,
+              fontFamily: 'monospace', fontSize: 10,
+              cursor: offset === 0 ? 'not-allowed' : 'pointer'
+            }}>← PREV</button>
 
             <div style={{ display: 'flex', gap: 4 }}>
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 const pageNum = Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i;
                 return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setOffset((pageNum - 1) * LIMIT)}
-                    style={{
-                      background: currentPage === pageNum ? 'rgba(245,158,11,0.2)' : 'transparent',
-                      border: currentPage === pageNum ? `1px solid ${C.gold}` : '1px solid #1B4332',
-                      color: currentPage === pageNum ? C.gold : C.dim,
-                      width: 32, height: 32, borderRadius: 4,
-                      fontFamily: 'monospace', fontSize: 10, cursor: 'pointer'
-                    }}
-                  >{pageNum}</button>
+                  <button key={pageNum} onClick={() => setOffset((pageNum - 1) * LIMIT)} style={{
+                    background: currentPage === pageNum ? 'rgba(245,158,11,0.2)' : 'transparent',
+                    border: currentPage === pageNum ? `1px solid ${C.gold}` : '1px solid #1B4332',
+                    color: currentPage === pageNum ? C.gold : C.dim,
+                    width: 32, height: 32, borderRadius: 4,
+                    fontFamily: 'monospace', fontSize: 10, cursor: 'pointer'
+                  }}>{pageNum}</button>
                 );
               })}
             </div>
 
-            <span style={{ color: C.dim, fontSize: 10 }}>
-              PAGE {currentPage} OF {totalPages}
-            </span>
+            <span style={{ color: C.dim, fontSize: 10 }}>PAGE {currentPage} OF {totalPages}</span>
 
-            <button
-              onClick={goNext}
-              disabled={offset + LIMIT >= data.total}
-              style={{
-                background: 'transparent',
-                border: `1px solid ${offset + LIMIT >= data.total ? '#1B4332' : C.dim}`,
-                color: offset + LIMIT >= data.total ? '#1B4332' : C.dim,
-                padding: '6px 16px', borderRadius: 4,
-                fontFamily: 'monospace', fontSize: 10,
-                cursor: offset + LIMIT >= data.total ? 'not-allowed' : 'pointer'
-              }}>NEXT →</button>
+            <button onClick={goNext} disabled={offset + LIMIT >= data.total} style={{
+              background: 'transparent',
+              border: `1px solid ${offset + LIMIT >= data.total ? '#1B4332' : C.dim}`,
+              color: offset + LIMIT >= data.total ? '#1B4332' : C.dim,
+              padding: '6px 16px', borderRadius: 4,
+              fontFamily: 'monospace', fontSize: 10,
+              cursor: offset + LIMIT >= data.total ? 'not-allowed' : 'pointer'
+            }}>NEXT →</button>
           </div>
         )}
       </>}
 
-      {/* Farmer Detail Side Panel */}
       <FarmerDetailPanel farmer={selected} onClose={() => setSelected(null)}/>
 
-      {/* Overlay */}
       {selected && (
-        <div
-          onClick={() => setSelected(null)}
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.4)', zIndex: 999
-          }}
-        />
+        <div onClick={() => setSelected(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999
+        }}/>
       )}
     </div>
   );
