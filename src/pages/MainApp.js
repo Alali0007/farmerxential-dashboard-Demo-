@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import OverviewPage from './OverviewPage';
@@ -14,16 +14,33 @@ const ZONE_NUMBER = {
 };
 
 export default function MainApp({ onLogout }) {
-  // useNavigate is like a GPS — it lets us change the URL programmatically
-  // Think of it like: calling navigate('/farmers') is like clicking a link
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const location  = useLocation();
 
-  // useLocation reads the current URL
-  // We use it to tell the Navbar which page is active
-  const location = useLocation();
+  // ── Slow loading detection ──
+  // If any page takes more than 3 seconds to load, show the warning banner
+  // Think of it like a timer — if the postman hasn't arrived in 3 seconds,
+  // slide a note under the door saying "he's on the way"
+  const [isSlowLoading, setIsSlowLoading] = useState(false);
+  const [isLoading, setIsLoading]         = useState(false);
+  const slowTimerRef                      = useRef(null);
 
-  // When someone clicks a zone on the map, go to /farmers?zone=2
-  // The zone number is now stored IN THE URL, not in useState
+  // When loading starts, start a 3 second timer
+  // If loading finishes before 3 seconds, cancel the timer — no banner shown
+  // If loading takes longer, show the banner
+  useEffect(() => {
+    if (isLoading) {
+      slowTimerRef.current = setTimeout(() => {
+        setIsSlowLoading(true);
+      }, 3000);
+    } else {
+      // Loading finished — hide banner and cancel timer
+      clearTimeout(slowTimerRef.current);
+      setIsSlowLoading(false);
+    }
+    return () => clearTimeout(slowTimerRef.current);
+  }, [isLoading]);
+
   const goToZone = (zoneName) => {
     const zoneNumber = ZONE_NUMBER[zoneName] ?? null;
     if (zoneNumber !== null) {
@@ -33,8 +50,6 @@ export default function MainApp({ onLogout }) {
     }
   };
 
-  // Work out which page is active from the URL
-  // This tells the Navbar which button to highlight
   const getActivePage = () => {
     if (location.pathname === '/farmers') return 'FARMERS';
     if (location.pathname === '/alerts')  return 'ALERTS';
@@ -42,7 +57,6 @@ export default function MainApp({ onLogout }) {
     return 'OVERVIEW';
   };
 
-  // When navbar button is clicked, navigate to the right URL
   const handleSetPage = (newPage) => {
     if (newPage === 'OVERVIEW') navigate('/');
     if (newPage === 'FARMERS')  navigate('/farmers');
@@ -60,14 +74,17 @@ export default function MainApp({ onLogout }) {
       `,
       backgroundSize: '40px 40px'
     }}>
-      <Navbar page={getActivePage()} setPage={handleSetPage} onLogout={onLogout}/>
+      <Navbar
+        page={getActivePage()}
+        setPage={handleSetPage}
+        onLogout={onLogout}
+        isSlowLoading={isSlowLoading}
+      />
 
-      {/* Routes is like a switchboard — it looks at the URL and renders the right page */}
-      {/* Think of each Route as: "if the URL is X, show Y" */}
       <Routes>
-        <Route path="/"        element={<OverviewPage onZoneClick={goToZone}/>}/>
-        <Route path="/farmers" element={<FarmersPage/>}/>
-        <Route path="/alerts"  element={<AlertsPage/>}/>
+        <Route path="/"        element={<OverviewPage onZoneClick={goToZone} onLoadingChange={setIsLoading}/>}/>
+        <Route path="/farmers" element={<FarmersPage onLoadingChange={setIsLoading}/>}/>
+        <Route path="/alerts"  element={<AlertsPage onLoadingChange={setIsLoading}/>}/>
         <Route path="/predict" element={<PredictPage/>}/>
       </Routes>
     </div>
