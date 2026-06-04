@@ -7,24 +7,50 @@ const C = {
   text: '#E8F5E9', dim: '#4CAF50'
 };
 
-export default function AlertsPage() {
+const CARDS_PER_PAGE = 50;
+
+export default function AlertsPage({ onLoadingChange }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState('ALL');
+  const [search, setSearch]   = useState('');
+  const [page, setPage]       = useState(1);
 
   useEffect(() => {
+    setLoading(true);
+    if (onLoadingChange) onLoadingChange(true);
     getAlerts()
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(d => {
+        setData(d);
+        setLoading(false);
+        if (onLoadingChange) onLoadingChange(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        if (onLoadingChange) onLoadingChange(false);
+      });
   }, []);
+
+  // Reset to page 1 when filter or search changes
+  // Think of it like: every time you change what you're looking for,
+  // go back to the beginning of the results
+  useEffect(() => { setPage(1); }, [filter, search]);
 
   const zones = data
     ? ['ALL', ...new Set(data.alerts.map(a => a.zone_name).filter(Boolean))]
     : ['ALL'];
 
+  // First apply zone filter, then apply search
   const filtered = data
-    ? (filter === 'ALL' ? data.alerts : data.alerts.filter(a => a.zone_name === filter))
+    ? data.alerts
+        .filter(a => filter === 'ALL' || a.zone_name === filter)
+        .filter(a => search === '' || String(a.hhid).includes(search.trim()))
     : [];
+
+  // Pagination
+  const totalPages  = Math.ceil(filtered.length / CARDS_PER_PAGE);
+  const startIndex  = (page - 1) * CARDS_PER_PAGE;
+  const paginated   = filtered.slice(startIndex, startIndex + CARDS_PER_PAGE);
 
   return (
     <div style={{ padding: 24, color: C.text, fontFamily: 'monospace' }}>
@@ -46,8 +72,8 @@ export default function AlertsPage() {
 
       {/* Zone Filter */}
       {data && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20, alignItems: 'center' }}>
-          <span style={{ color: C.dim, fontSize: 10 }}>ZONE:</span>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
+          <span style={{ color: C.dim, fontSize: 10, fontWeight: 'bold' }}>ZONE:</span>
           {zones.map(z => (
             <button key={z} onClick={() => setFilter(z)} style={{
               background: filter === z ? 'rgba(226,75,74,0.15)' : 'transparent',
@@ -57,11 +83,36 @@ export default function AlertsPage() {
               fontFamily: 'monospace', fontSize: 10, cursor: 'pointer', letterSpacing: 1
             }}>{z.toUpperCase()}</button>
           ))}
-          <span style={{ color: C.dim, fontSize: 10, marginLeft: 8 }}>
-            SHOWING {filtered.length} ALERTS
-          </span>
         </div>
       )}
+
+      {/* Search */}
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <input
+          placeholder="🔍  Search by HHID..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{
+            background: 'rgba(27,67,50,0.2)',
+            border: `1px solid ${search ? C.gold : '#1B4332'}`,
+            borderRadius: 6, padding: '8px 14px',
+            color: C.text, fontFamily: 'monospace',
+            fontSize: 12, outline: 'none', width: 220
+          }}
+        />
+        {search && (
+          <button onClick={() => setSearch('')} style={{
+            background: 'transparent', border: '1px solid #1B4332',
+            color: C.dim, padding: '6px 12px', borderRadius: 4,
+            fontFamily: 'monospace', fontSize: 10, cursor: 'pointer'
+          }}>CLEAR</button>
+        )}
+        {data && (
+          <span style={{ color: C.dim, fontSize: 10 }}>
+            SHOWING {filtered.length} OF {data.total_alerts} ALERTS
+          </span>
+        )}
+      </div>
 
       {loading && (
         <div style={{ color: C.dim, padding: 60, textAlign: 'center', fontSize: 13 }}>
@@ -69,14 +120,21 @@ export default function AlertsPage() {
         </div>
       )}
 
+      {/* No results */}
+      {!loading && data && filtered.length === 0 && (
+        <div style={{ padding: 60, textAlign: 'center', color: C.dim, fontSize: 12 }}>
+          {search ? `NO ALERTS FOUND FOR HHID "${search}"` : 'NO ALERTS FOR THIS ZONE'}
+        </div>
+      )}
+
       {/* Alert Cards */}
-      {data && (
+      {data && filtered.length > 0 && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
           gap: 16
         }}>
-          {filtered.slice(0, 80).map(a => (
+          {paginated.map(a => (
             <div key={a.hhid} style={{
               background: 'rgba(226,75,74,0.05)',
               border: '1px solid rgba(226,75,74,0.3)',
@@ -131,11 +189,68 @@ export default function AlertsPage() {
                 display: 'flex', gap: 16, fontSize: 10, color: C.dim
               }}>
                 <span>YIELD: {Number(a.yield_original).toFixed(1)}</span>
-                <span>SHOCK: {a.shock_level > 0 ? <span style={{ color: C.high }}>⚠ YES</span> : 'NO'}</span>
-                <span>EXT: {a.has_extension_access ? <span style={{ color: C.low }}>✓</span> : <span style={{ color: C.high }}>✗</span>}</span>
+                <span>SHOCK: {a.shock_level > 0
+                  ? <span style={{ color: C.high }}>⚠ YES</span>
+                  : 'NO'}
+                </span>
+                <span>EXT: {a.has_extension_access
+                  ? <span style={{ color: C.low }}>✓</span>
+                  : <span style={{ color: C.high }}>✗</span>}
+                </span>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div style={{
+          display: 'flex', gap: 12, marginTop: 24,
+          justifyContent: 'center', alignItems: 'center'
+        }}>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{
+              background: 'transparent',
+              border: `1px solid ${page === 1 ? '#1B4332' : C.dim}`,
+              color: page === 1 ? '#1B4332' : C.dim,
+              padding: '6px 16px', borderRadius: 4,
+              fontFamily: 'monospace', fontSize: 10,
+              cursor: page === 1 ? 'not-allowed' : 'pointer'
+            }}>← PREV</button>
+
+          <div style={{ display: 'flex', gap: 4 }}>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pageNum = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
+              return (
+                <button key={pageNum} onClick={() => setPage(pageNum)} style={{
+                  background: page === pageNum ? 'rgba(226,75,74,0.2)' : 'transparent',
+                  border: page === pageNum ? `1px solid ${C.high}` : '1px solid #1B4332',
+                  color: page === pageNum ? C.high : C.dim,
+                  width: 32, height: 32, borderRadius: 4,
+                  fontFamily: 'monospace', fontSize: 10, cursor: 'pointer'
+                }}>{pageNum}</button>
+              );
+            })}
+          </div>
+
+          <span style={{ color: C.dim, fontSize: 10 }}>
+            PAGE {page} OF {totalPages}
+          </span>
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            style={{
+              background: 'transparent',
+              border: `1px solid ${page === totalPages ? '#1B4332' : C.dim}`,
+              color: page === totalPages ? '#1B4332' : C.dim,
+              padding: '6px 16px', borderRadius: 4,
+              fontFamily: 'monospace', fontSize: 10,
+              cursor: page === totalPages ? 'not-allowed' : 'pointer'
+            }}>NEXT →</button>
         </div>
       )}
 
