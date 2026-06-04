@@ -5,7 +5,7 @@ const C = { green: '#1B4332', gold: '#F59E0B', dim: '#4CAF50' };
 export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
   const [time, setTime]                           = useState(new Date().toLocaleTimeString());
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [isMobile, setIsMobile]                   = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile]                   = useState(window.innerWidth < 900);
 
   const tabs = ['OVERVIEW', 'FARMERS', 'ALERTS', 'INTERVENTIONS', 'PREDICT'];
 
@@ -15,7 +15,7 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
   }, []);
 
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
+    const handler = () => setIsMobile(window.innerWidth < 900);
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
