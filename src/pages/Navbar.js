@@ -5,7 +5,7 @@ const C = { green: '#1B4332', gold: '#F59E0B', dim: '#4CAF50' };
 export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
   const [time, setTime]                           = useState(new Date().toLocaleTimeString());
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [isMobile, setIsMobile]                   = useState(window.innerWidth < 900);
+  const [menuOpen, setMenuOpen]                   = useState(false);
 
   const tabs = ['OVERVIEW', 'FARMERS', 'ALERTS', 'INTERVENTIONS', 'PREDICT'];
 
@@ -14,93 +14,132 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 900);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+  const handleNav = (tab) => {
+    setPage(tab);
+    setMenuOpen(false);
+  };
 
   return (
     <>
+      {/* ── Main navbar bar ── */}
       <div style={{
         background: 'rgba(6,13,10,0.97)',
         borderBottom: '1px solid #1B4332',
-        padding: '0 12px',
+        padding: '0 16px',
         display: 'flex',
         alignItems: 'center',
-        gap: 4,
+        justifyContent: 'space-between',
         position: 'sticky',
         top: 0,
-        zIndex: 100,
-        overflowX: 'auto',  // scrollable on mobile
-        WebkitOverflowScrolling: 'touch'
+        zIndex: 200,
+        minHeight: 52
       }}>
         {/* Logo */}
         <div style={{
-          color: C.gold, fontSize: isMobile ? 12 : 15,
-          fontWeight: 'bold', fontFamily: 'monospace',
-          letterSpacing: 2, marginRight: 12, padding: '14px 0',
-          flexShrink: 0
+          color: C.gold, fontWeight: 'bold',
+          fontFamily: 'monospace', letterSpacing: 2,
+          fontSize: 13, flexShrink: 0
         }}>
-          🌱 {isMobile ? 'FX' : 'FARMERXENTIAL'}
+          🌱 FARMERXENTIAL
         </div>
 
-        {/* Tabs */}
-        {tabs.map(t => (
-          <button key={t} onClick={() => setPage(t)} style={{
-            background: page === t ? 'rgba(27,67,50,0.5)' : 'transparent',
-            border: page === t ? `1px solid ${C.gold}` : '1px solid transparent',
-            color: page === t ? C.gold : C.dim,
-            padding: isMobile ? '6px 10px' : '8px 16px',
-            borderRadius: 4, fontFamily: 'monospace',
-            fontSize: isMobile ? 9 : 11,
-            letterSpacing: 1, cursor: 'pointer',
-            flexShrink: 0, whiteSpace: 'nowrap'
-          }}>{t}</button>
-        ))}
+        {/* Desktop tabs — hidden on small screens via CSS */}
+        <div className="desktop-tabs" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {tabs.map(t => (
+            <button key={t} onClick={() => handleNav(t)} style={{
+              background: page === t ? 'rgba(27,67,50,0.5)' : 'transparent',
+              border: page === t ? `1px solid ${C.gold}` : '1px solid transparent',
+              color: page === t ? C.gold : C.dim,
+              padding: '7px 12px', borderRadius: 4,
+              fontFamily: 'monospace', fontSize: 10,
+              letterSpacing: 1, cursor: 'pointer', whiteSpace: 'nowrap'
+            }}>{t}</button>
+          ))}
+        </div>
 
-        <div style={{ flex: 1, minWidth: 8 }} />
-
-        {/* Clock — hidden on mobile to save space */}
-        {!isMobile && (
-          <div style={{ color: C.dim, fontSize: 9, fontFamily: 'monospace', marginRight: 16, flexShrink: 0 }}>
-            ● SYSTEM ONLINE &nbsp;|&nbsp; {time}
+        {/* Right side */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {/* Clock — desktop only */}
+          <div className="desktop-only" style={{ color: C.dim, fontSize: 9, fontFamily: 'monospace' }}>
+            ● {time}
           </div>
-        )}
 
-        {/* Logout */}
-        {!showLogoutConfirm ? (
-          <button onClick={() => setShowLogoutConfirm(true)} style={{
-            background: 'transparent', border: '1px solid #1B4332',
-            color: C.dim, padding: '6px 10px', borderRadius: 4,
-            fontFamily: 'monospace', fontSize: 9, cursor: 'pointer',
-            flexShrink: 0
-          }}>OUT</button>
-        ) : (
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
-            <span style={{ color: C.dim, fontSize: 9, fontFamily: 'monospace' }}>SURE?</span>
-            <button onClick={onLogout} style={{
-              background: 'rgba(226,75,74,0.15)', border: '1px solid #E24B4A',
-              color: '#E24B4A', padding: '4px 8px', borderRadius: 4,
-              fontFamily: 'monospace', fontSize: 9, cursor: 'pointer'
-            }}>YES</button>
-            <button onClick={() => setShowLogoutConfirm(false)} style={{
+          {/* Logout */}
+          {!showLogoutConfirm ? (
+            <button onClick={() => setShowLogoutConfirm(true)} style={{
               background: 'transparent', border: '1px solid #1B4332',
-              color: C.dim, padding: '4px 8px', borderRadius: 4,
+              color: C.dim, padding: '5px 10px', borderRadius: 4,
               fontFamily: 'monospace', fontSize: 9, cursor: 'pointer'
-            }}>NO</button>
-          </div>
-        )}
+            }}>OUT</button>
+          ) : (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span style={{ color: C.dim, fontSize: 9, fontFamily: 'monospace' }}>SURE?</span>
+              <button onClick={onLogout} style={{
+                background: 'rgba(226,75,74,0.15)', border: '1px solid #E24B4A',
+                color: '#E24B4A', padding: '4px 8px', borderRadius: 4,
+                fontFamily: 'monospace', fontSize: 9, cursor: 'pointer'
+              }}>YES</button>
+              <button onClick={() => setShowLogoutConfirm(false)} style={{
+                background: 'transparent', border: '1px solid #1B4332',
+                color: C.dim, padding: '4px 8px', borderRadius: 4,
+                fontFamily: 'monospace', fontSize: 9, cursor: 'pointer'
+              }}>NO</button>
+            </div>
+          )}
+
+          {/* Hamburger menu button — mobile only */}
+          <button
+            className="mobile-only"
+            onClick={() => setMenuOpen(o => !o)}
+            style={{
+              background: menuOpen ? 'rgba(27,67,50,0.5)' : 'transparent',
+              border: `1px solid ${menuOpen ? C.gold : '#1B4332'}`,
+              color: menuOpen ? C.gold : C.dim,
+              padding: '5px 10px', borderRadius: 4,
+              fontFamily: 'monospace', fontSize: 14, cursor: 'pointer'
+            }}
+          >☰</button>
+        </div>
       </div>
 
-      {/* Slow connection banner */}
+      {/* ── Mobile dropdown menu ── */}
+      {menuOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 52,
+          left: 0,
+          right: 0,
+          background: 'rgba(6,13,10,0.98)',
+          borderBottom: `2px solid ${C.gold}`,
+          zIndex: 199,
+          padding: '8px 0'
+        }}>
+          {tabs.map(t => (
+            <button key={t} onClick={() => handleNav(t)} style={{
+              display: 'block',
+              width: '100%',
+              background: page === t ? 'rgba(27,67,50,0.5)' : 'transparent',
+              border: 'none',
+              borderLeft: page === t ? `3px solid ${C.gold}` : '3px solid transparent',
+              color: page === t ? C.gold : C.dim,
+              padding: '14px 20px',
+              fontFamily: 'monospace', fontSize: 13,
+              letterSpacing: 2, cursor: 'pointer',
+              textAlign: 'left'
+            }}>{t}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Slow connection banner ── */}
       {isSlowLoading && (
         <div style={{
           background: 'rgba(245,158,11,0.1)',
           border: '1px solid rgba(245,158,11,0.3)',
           borderTop: 'none', padding: '8px 16px',
           display: 'flex', alignItems: 'center', gap: 10,
-          fontFamily: 'monospace', fontSize: 11
+          fontFamily: 'monospace', fontSize: 11,
+          position: 'sticky', top: 52, zIndex: 199
         }}>
           <span style={{
             display: 'inline-block', width: 8, height: 8,
@@ -117,6 +156,18 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
         @keyframes pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50%       { opacity: 0.4; transform: scale(0.8); }
+        }
+        /* Desktop: show tabs, hide hamburger */
+        @media (min-width: 768px) {
+          .desktop-tabs { display: flex !important; }
+          .desktop-only { display: block !important; }
+          .mobile-only  { display: none !important; }
+        }
+        /* Mobile: hide tabs, show hamburger */
+        @media (max-width: 767px) {
+          .desktop-tabs { display: none !important; }
+          .desktop-only { display: none !important; }
+          .mobile-only  { display: block !important; }
         }
       `}</style>
     </>
