@@ -1,8 +1,5 @@
 /* ==============================
    GLOBAL RESET & MOBILE FIX
-   This is the most important section.
-   Think of it like: setting rules for the whole building
-   before furnishing individual rooms.
 ============================== */
 
 *, *::before, *::after {
@@ -14,12 +11,15 @@
 html {
   overflow-x: hidden;
   width: 100%;
+  background: #060D0A;
 }
 
 body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100vw;
+  background: #060D0A;
+  color: #E8F5E9;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -27,64 +27,44 @@ body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100vw;
+  background: #060D0A;
+  min-height: 100vh;
 }
 
-/* ==============================
-   FORCE ALL ELEMENTS TO STAY
-   WITHIN SCREEN WIDTH
-   This catches any element that
-   tries to be wider than the screen
-============================== */
+/* Force all elements to stay within screen width */
 * {
   max-width: 100%;
 }
 
-/* ==============================
-   INPUTS & BUTTONS
-   Make them easier to tap on mobile
-============================== */
+/* Inputs & buttons */
 input, select, textarea, button {
   max-width: 100%;
   font-family: monospace;
 }
 
-/* ==============================
-   IMAGES & MEDIA
-============================== */
+/* Images & media */
 img, video, canvas, svg {
   max-width: 100%;
   height: auto;
 }
 
-/* ==============================
-   LEAFLET MAP FIX
-   Leaflet sometimes overflows on mobile
-============================== */
+/* Leaflet map fix */
 .leaflet-container {
   width: 100% !important;
   max-width: 100% !important;
 }
 
-/* ==============================
-   MOBILE SPECIFIC OVERRIDES
-   These only apply on screens
-   smaller than 768px (phones)
-============================== */
+/* Mobile overrides */
 @media (max-width: 767px) {
-
-  /* Force all divs to respect screen width */
   div {
     max-width: 100vw;
   }
 
-  /* Prevent text from causing overflow */
   p, span, h1, h2, h3, h4, h5, h6 {
     word-break: break-word;
     overflow-wrap: break-word;
   }
 
-  /* Make tables scroll horizontally
-     instead of breaking the layout */
   table {
     display: block;
     overflow-x: auto;
@@ -94,7 +74,6 @@ img, video, canvas, svg {
 
 /* ==============================
    ORIGINAL REACT APP STYLES
-   (kept for compatibility)
 ============================== */
 .App {
   text-align: center;
