@@ -3,28 +3,42 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="FarmerXential — Identifying the Farmers Who Need Help Most"
-    />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, viewport-fit=cover" />
+
+    <meta name="theme-color" content="#060D0A" />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FarmerX" />
+
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <meta name="description" content="FarmerXential — Identifying the Farmers Who Need Help Most" />
+
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
     <title>FarmerXential - Identifying the farmers who needs help most</title>
+
     <style>
       *, *::before, *::after {
         box-sizing: border-box;
+        margin: 0;
+        padding: 0;
       }
       html, body {
         overflow-x: hidden;
         max-width: 100vw;
-        margin: 0;
-        padding: 0;
+        background: #060D0A;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
       }
       #root {
         overflow-x: hidden;
         max-width: 100vw;
+        min-height: 100vh;
+        background: #060D0A;
       }
     </style>
   </head>

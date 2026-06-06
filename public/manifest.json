@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "FarmerX",
+  "name": "FarmerXential - Identifying Farmers Who Need Help Most",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +10,20 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait",
+  "theme_color": "#060D0A",
+  "background_color": "#060D0A",
+  "description": "AI-powered agricultural intelligence system by Lalishank Holdings Limited"
 }
