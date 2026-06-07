@@ -7,7 +7,13 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [menuOpen, setMenuOpen]                   = useState(false);
 
-  const tabs = ['OVERVIEW', 'FARMERS', 'ALERTS', 'INTERVENTIONS', 'PREDICT'];
+  const tabs = [
+    { name: 'OVERVIEW',      icon: '◈' },
+    { name: 'FARMERS',       icon: '🌾' },
+    { name: 'ALERTS',        icon: '⚠' },
+    { name: 'INTERVENTIONS', icon: '✦' },
+    { name: 'PREDICT',       icon: '◉' },
+  ];
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date().toLocaleTimeString()), 1000);
@@ -49,14 +55,14 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
         {/* Desktop tabs */}
         <div className="desktop-tabs" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {tabs.map(t => (
-            <button key={t} onClick={() => handleNav(t)} style={{
-              background: page === t ? 'rgba(27,67,50,0.5)' : 'transparent',
-              border: page === t ? `1px solid ${C.gold}` : '1px solid transparent',
-              color: page === t ? C.gold : C.dim,
+            <button key={t.name} onClick={() => handleNav(t.name)} style={{
+              background: page === t.name ? 'rgba(27,67,50,0.5)' : 'transparent',
+              border: page === t.name ? `1px solid ${C.gold}` : '1px solid transparent',
+              color: page === t.name ? C.gold : C.dim,
               padding: '7px 12px', borderRadius: 4,
               fontFamily: 'monospace', fontSize: 10,
               letterSpacing: 1, cursor: 'pointer', whiteSpace: 'nowrap'
-            }}>{t}</button>
+            }}>{t.name}</button>
           ))}
         </div>
 
@@ -98,11 +104,11 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
           {/* Hamburger button — mobile only */}
           <button
             className="mobile-only"
-            onClick={() => setMenuOpen(o => !o)}
+            onClick={() => setMenuOpen(true)}
             style={{
-              background: menuOpen ? `${C.gold}22` : 'transparent',
-              border: `1px solid ${menuOpen ? C.gold : '#1B4332'}`,
-              color: menuOpen ? C.gold : C.dim,
+              background: 'transparent',
+              border: `1px solid #1B4332`,
+              color: C.dim,
               padding: '6px 10px', borderRadius: 4,
               fontFamily: 'monospace', fontSize: 16,
               cursor: 'pointer', flexShrink: 0,
@@ -133,89 +139,111 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
         </div>
       )}
 
-      {/* ── Side drawer overlay (dark background) ──
-          Appears behind the drawer, tapping it closes the menu
-          Think of it like: the curtain behind an open door */}
+      {/* ── Full screen menu overlay ──
+          When ☰ is tapped, this covers the ENTIRE screen
+          like a proper mobile app menu page */}
       {menuOpen && (
-        <div
-          onClick={() => setMenuOpen(false)}
-          style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.6)',
-            zIndex: 1000
-          }}
-        />
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: '#060D0A',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: 'monospace'
+        }}>
+
+          {/* Menu header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 20px',
+            borderBottom: `1px solid ${C.gold}44`,
+            minHeight: 60
+          }}>
+            <div style={{ color: C.gold, fontSize: 13, fontWeight: 'bold', letterSpacing: 2 }}>
+              🌱 FARMERXENTIAL
+            </div>
+            <button onClick={() => setMenuOpen(false)} style={{
+              background: 'transparent',
+              border: `1px solid #1B4332`,
+              color: C.dim, width: 36, height: 36,
+              borderRadius: 4, fontSize: 18,
+              cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center'
+            }}>✕</button>
+          </div>
+
+          {/* Current page indicator */}
+          <div style={{
+            padding: '12px 20px',
+            color: C.dim, fontSize: 9, letterSpacing: 2
+          }}>
+            CURRENTLY VIEWING: <span style={{ color: C.gold }}>{page}</span>
+          </div>
+
+          {/* Nav items — big, easy to tap */}
+          <div style={{ flex: 1, paddingTop: 8 }}>
+            {tabs.map(t => (
+              <button key={t.name} onClick={() => handleNav(t.name)} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                width: '100%',
+                background: page === t.name
+                  ? 'rgba(245,158,11,0.08)'
+                  : 'transparent',
+                border: 'none',
+                borderLeft: page === t.name
+                  ? `4px solid ${C.gold}`
+                  : '4px solid transparent',
+                borderBottom: '1px solid rgba(27,67,50,0.3)',
+                color: page === t.name ? C.gold : C.dim,
+                padding: '20px 24px',
+                fontFamily: 'monospace', fontSize: 16,
+                letterSpacing: 2, cursor: 'pointer',
+                textAlign: 'left', boxSizing: 'border-box'
+              }}>
+                <span style={{ fontSize: 20, width: 28 }}>{t.icon}</span>
+                <span>{t.name}</span>
+                {page === t.name && (
+                  <span style={{
+                    marginLeft: 'auto', fontSize: 10,
+                    color: C.gold, letterSpacing: 1
+                  }}>● ACTIVE</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Bottom — logout + version */}
+          <div style={{
+            borderTop: '1px solid #1B4332',
+            padding: '16px 20px'
+          }}>
+            <button
+              onClick={() => { setMenuOpen(false); onLogout(); }}
+              style={{
+                width: '100%', padding: '14px',
+                background: 'rgba(226,75,74,0.1)',
+                border: '1px solid rgba(226,75,74,0.4)',
+                color: '#E24B4A', borderRadius: 6,
+                fontFamily: 'monospace', fontSize: 12,
+                letterSpacing: 2, cursor: 'pointer',
+                marginBottom: 12
+              }}
+            >⏻ LOGOUT</button>
+
+            <div style={{
+              color: '#1B4332', fontSize: 9,
+              textAlign: 'center', letterSpacing: 1
+            }}>
+              FARMERXENTIAL v3.0 — LALISHANK HOLDINGS LIMITED
+            </div>
+          </div>
+        </div>
       )}
-
-      {/* ── Side drawer ──
-          Slides in from the RIGHT side of the screen
-          width: 75% so you can still see the page behind it
-          Think of it like: a door sliding open from the right */}
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        right: menuOpen ? 0 : '-75%', // slides in/out
-        width: '75%',
-        maxWidth: 280,
-        height: '100%',
-        background: '#060D0A',
-        borderLeft: `2px solid ${C.gold}`,
-        zIndex: 1001,
-        transition: 'right 0.3s ease',
-        display: 'flex',
-        flexDirection: 'column',
-        paddingTop: 60
-      }}>
-
-        {/* Close button at top of drawer */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between',
-          alignItems: 'center', padding: '0 20px 20px 20px',
-          borderBottom: '1px solid #1B4332'
-        }}>
-          <span style={{ color: C.gold, fontFamily: 'monospace', fontSize: 11, letterSpacing: 2 }}>
-            MENU
-          </span>
-          <button onClick={() => setMenuOpen(false)} style={{
-            background: 'transparent', border: `1px solid #1B4332`,
-            color: C.dim, width: 32, height: 32, borderRadius: 4,
-            fontFamily: 'monospace', fontSize: 16, cursor: 'pointer'
-          }}>✕</button>
-        </div>
-
-        {/* Nav items */}
-        <div style={{ flex: 1, paddingTop: 8 }}>
-          {tabs.map(t => (
-            <button key={t} onClick={() => handleNav(t)} style={{
-              display: 'block',
-              width: '100%',
-              background: page === t ? 'rgba(27,67,50,0.6)' : 'transparent',
-              border: 'none',
-              borderLeft: page === t ? `4px solid ${C.gold}` : '4px solid transparent',
-              color: page === t ? C.gold : C.dim,
-              padding: '16px 20px',
-              fontFamily: 'monospace', fontSize: 13,
-              letterSpacing: 2, cursor: 'pointer',
-              textAlign: 'left', boxSizing: 'border-box',
-              borderBottom: '1px solid rgba(27,67,50,0.3)'
-            }}>{t}</button>
-          ))}
-        </div>
-
-        {/* Bottom of drawer — version info */}
-        <div style={{
-          padding: '16px 20px',
-          borderTop: '1px solid #1B4332',
-          color: '#1B4332',
-          fontFamily: 'monospace',
-          fontSize: 9,
-          letterSpacing: 1
-        }}>
-          FARMERXENTIAL v3.0<br/>
-          LALISHANK HOLDINGS LIMITED
-        </div>
-      </div>
 
       <style>{`
         @keyframes pulse {
