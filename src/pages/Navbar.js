@@ -20,7 +20,10 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
   };
 
   return (
-    <>
+    // Wrapper div — position relative so dropdown positions relative to this
+    <div style={{ position: 'sticky', top: 0, zIndex: 9999, width: '100%' }}>
+
+      {/* ── Main navbar bar ── */}
       <div style={{
         background: 'rgba(6,13,10,0.97)',
         borderBottom: '1px solid #1B4332',
@@ -28,14 +31,14 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        position: 'sticky',
-        top: 0,
-        zIndex: 9998,
         minHeight: 52,
         width: '100%',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        position: 'relative',
+        zIndex: 9999
       }}>
 
+        {/* Logo */}
         <div style={{
           color: C.gold, fontWeight: 'bold',
           fontFamily: 'monospace', letterSpacing: 2,
@@ -44,6 +47,7 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
           🌱 FARMERXENTIAL
         </div>
 
+        {/* Desktop tabs */}
         <div className="desktop-tabs" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {tabs.map(t => (
             <button key={t} onClick={() => handleNav(t)} style={{
@@ -57,7 +61,10 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
           ))}
         </div>
 
+        {/* Right side */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+
+          {/* Clock — desktop only */}
           <div className="desktop-only" style={{
             color: C.dim, fontSize: 9,
             fontFamily: 'monospace', whiteSpace: 'nowrap'
@@ -65,6 +72,7 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
             ● {time}
           </div>
 
+          {/* Logout */}
           {!showLogoutConfirm ? (
             <button onClick={() => setShowLogoutConfirm(true)} style={{
               background: 'transparent', border: '1px solid #1B4332',
@@ -88,11 +96,12 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
             </div>
           )}
 
+          {/* Hamburger button — mobile only */}
           <button
             className="mobile-only"
             onClick={() => setMenuOpen(o => !o)}
             style={{
-              background: menuOpen ? 'rgba(27,67,50,0.5)' : 'transparent',
+              background: menuOpen ? `${C.gold}22` : 'transparent',
               border: `1px solid ${menuOpen ? C.gold : '#1B4332'}`,
               color: menuOpen ? C.gold : C.dim,
               padding: '6px 10px', borderRadius: 4,
@@ -104,55 +113,60 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
         </div>
       </div>
 
+      {/* ── Mobile dropdown menu ──
+          position: absolute means it drops DOWN from the navbar
+          width: 100vw makes it full screen width
+          This approach works on all iOS Safari versions */}
       {menuOpen && (
-        <>
-          <div
-            onClick={() => setMenuOpen(false)}
-            style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              background: 'rgba(0,0,0,0.5)',
-              zIndex: 9998
-            }}
-          />
-          <div style={{
-            position: 'fixed',
-            top: 52,
-            left: 0,
-            right: 0,
-            background: 'rgba(6,13,10,0.99)',
-            borderBottom: `2px solid ${C.gold}`,
-            zIndex: 9999,
-            paddingTop: 8,
-            paddingBottom: 8,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.8)'
-          }}>
-            {tabs.map(t => (
-              <button key={t} onClick={() => handleNav(t)} style={{
-                display: 'block',
-                width: '100%',
-                background: page === t ? 'rgba(27,67,50,0.5)' : 'transparent',
-                border: 'none',
-                borderLeft: page === t ? `4px solid ${C.gold}` : '4px solid transparent',
-                color: page === t ? C.gold : C.dim,
-                padding: '16px 20px',
-                fontFamily: 'monospace', fontSize: 14,
-                letterSpacing: 2, cursor: 'pointer',
-                textAlign: 'left', boxSizing: 'border-box'
-              }}>{t}</button>
-            ))}
-          </div>
-        </>
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          width: '100%',
+          background: '#060D0A',
+          borderBottom: `3px solid ${C.gold}`,
+          borderTop: 'none',
+          zIndex: 9999,
+          boxShadow: '0 16px 40px rgba(0,0,0,0.9)'
+        }}>
+          {tabs.map(t => (
+            <button key={t} onClick={() => handleNav(t)} style={{
+              display: 'block',
+              width: '100%',
+              background: page === t ? 'rgba(27,67,50,0.6)' : 'transparent',
+              border: 'none',
+              borderLeft: page === t ? `4px solid ${C.gold}` : `4px solid transparent`,
+              borderBottom: '1px solid rgba(27,67,50,0.3)',
+              color: page === t ? C.gold : C.dim,
+              padding: '18px 24px',
+              fontFamily: 'monospace', fontSize: 15,
+              letterSpacing: 2, cursor: 'pointer',
+              textAlign: 'left', boxSizing: 'border-box'
+            }}>{t}</button>
+          ))}
+
+          {/* Close button at bottom */}
+          <button onClick={() => setMenuOpen(false)} style={{
+            display: 'block', width: '100%',
+            background: 'transparent', border: 'none',
+            borderTop: `1px solid ${C.gold}44`,
+            color: C.dim, padding: '14px 24px',
+            fontFamily: 'monospace', fontSize: 11,
+            letterSpacing: 2, cursor: 'pointer',
+            textAlign: 'center', boxSizing: 'border-box'
+          }}>✕ CLOSE</button>
+        </div>
       )}
 
+      {/* ── Slow connection banner ── */}
       {isSlowLoading && (
         <div style={{
           background: 'rgba(245,158,11,0.1)',
           border: '1px solid rgba(245,158,11,0.3)',
           borderTop: 'none', padding: '8px 16px',
           display: 'flex', alignItems: 'center', gap: 10,
-          fontFamily: 'monospace', fontSize: 11,
-          position: 'sticky', top: 52, zIndex: 9997
+          fontFamily: 'monospace', fontSize: 11
         }}>
           <span style={{
             display: 'inline-block', width: 8, height: 8,
@@ -181,6 +195,6 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
           .mobile-only  { display: block !important; }
         }
       `}</style>
-    </>
+    </div>
   );
 }
