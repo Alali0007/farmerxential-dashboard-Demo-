@@ -20,9 +20,7 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
   };
 
   return (
-    // Wrapper div — position relative so dropdown positions relative to this
-    <div style={{ position: 'sticky', top: 0, zIndex: 9999, width: '100%' }}>
-
+    <>
       {/* ── Main navbar bar ── */}
       <div style={{
         background: 'rgba(6,13,10,0.97)',
@@ -31,11 +29,12 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        position: 'sticky',
+        top: 0,
+        zIndex: 500,
         minHeight: 52,
         width: '100%',
-        boxSizing: 'border-box',
-        position: 'relative',
-        zIndex: 9999
+        boxSizing: 'border-box'
       }}>
 
         {/* Logo */}
@@ -113,60 +112,15 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
         </div>
       </div>
 
-      {/* ── Mobile dropdown menu ──
-          position: absolute means it drops DOWN from the navbar
-          width: 100vw makes it full screen width
-          This approach works on all iOS Safari versions */}
-      {menuOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          right: 0,
-          width: '100%',
-          background: '#060D0A',
-          borderBottom: `3px solid ${C.gold}`,
-          borderTop: 'none',
-          zIndex: 9999,
-          boxShadow: '0 16px 40px rgba(0,0,0,0.9)'
-        }}>
-          {tabs.map(t => (
-            <button key={t} onClick={() => handleNav(t)} style={{
-              display: 'block',
-              width: '100%',
-              background: page === t ? 'rgba(27,67,50,0.6)' : 'transparent',
-              border: 'none',
-              borderLeft: page === t ? `4px solid ${C.gold}` : `4px solid transparent`,
-              borderBottom: '1px solid rgba(27,67,50,0.3)',
-              color: page === t ? C.gold : C.dim,
-              padding: '18px 24px',
-              fontFamily: 'monospace', fontSize: 15,
-              letterSpacing: 2, cursor: 'pointer',
-              textAlign: 'left', boxSizing: 'border-box'
-            }}>{t}</button>
-          ))}
-
-          {/* Close button at bottom */}
-          <button onClick={() => setMenuOpen(false)} style={{
-            display: 'block', width: '100%',
-            background: 'transparent', border: 'none',
-            borderTop: `1px solid ${C.gold}44`,
-            color: C.dim, padding: '14px 24px',
-            fontFamily: 'monospace', fontSize: 11,
-            letterSpacing: 2, cursor: 'pointer',
-            textAlign: 'center', boxSizing: 'border-box'
-          }}>✕ CLOSE</button>
-        </div>
-      )}
-
-      {/* ── Slow connection banner ── */}
+      {/* Slow connection banner */}
       {isSlowLoading && (
         <div style={{
           background: 'rgba(245,158,11,0.1)',
           border: '1px solid rgba(245,158,11,0.3)',
           borderTop: 'none', padding: '8px 16px',
           display: 'flex', alignItems: 'center', gap: 10,
-          fontFamily: 'monospace', fontSize: 11
+          fontFamily: 'monospace', fontSize: 11,
+          position: 'sticky', top: 52, zIndex: 499
         }}>
           <span style={{
             display: 'inline-block', width: 8, height: 8,
@@ -178,6 +132,90 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
           </span>
         </div>
       )}
+
+      {/* ── Side drawer overlay (dark background) ──
+          Appears behind the drawer, tapping it closes the menu
+          Think of it like: the curtain behind an open door */}
+      {menuOpen && (
+        <div
+          onClick={() => setMenuOpen(false)}
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 1000
+          }}
+        />
+      )}
+
+      {/* ── Side drawer ──
+          Slides in from the RIGHT side of the screen
+          width: 75% so you can still see the page behind it
+          Think of it like: a door sliding open from the right */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        right: menuOpen ? 0 : '-75%', // slides in/out
+        width: '75%',
+        maxWidth: 280,
+        height: '100%',
+        background: '#060D0A',
+        borderLeft: `2px solid ${C.gold}`,
+        zIndex: 1001,
+        transition: 'right 0.3s ease',
+        display: 'flex',
+        flexDirection: 'column',
+        paddingTop: 60
+      }}>
+
+        {/* Close button at top of drawer */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', padding: '0 20px 20px 20px',
+          borderBottom: '1px solid #1B4332'
+        }}>
+          <span style={{ color: C.gold, fontFamily: 'monospace', fontSize: 11, letterSpacing: 2 }}>
+            MENU
+          </span>
+          <button onClick={() => setMenuOpen(false)} style={{
+            background: 'transparent', border: `1px solid #1B4332`,
+            color: C.dim, width: 32, height: 32, borderRadius: 4,
+            fontFamily: 'monospace', fontSize: 16, cursor: 'pointer'
+          }}>✕</button>
+        </div>
+
+        {/* Nav items */}
+        <div style={{ flex: 1, paddingTop: 8 }}>
+          {tabs.map(t => (
+            <button key={t} onClick={() => handleNav(t)} style={{
+              display: 'block',
+              width: '100%',
+              background: page === t ? 'rgba(27,67,50,0.6)' : 'transparent',
+              border: 'none',
+              borderLeft: page === t ? `4px solid ${C.gold}` : '4px solid transparent',
+              color: page === t ? C.gold : C.dim,
+              padding: '16px 20px',
+              fontFamily: 'monospace', fontSize: 13,
+              letterSpacing: 2, cursor: 'pointer',
+              textAlign: 'left', boxSizing: 'border-box',
+              borderBottom: '1px solid rgba(27,67,50,0.3)'
+            }}>{t}</button>
+          ))}
+        </div>
+
+        {/* Bottom of drawer — version info */}
+        <div style={{
+          padding: '16px 20px',
+          borderTop: '1px solid #1B4332',
+          color: '#1B4332',
+          fontFamily: 'monospace',
+          fontSize: 9,
+          letterSpacing: 1
+        }}>
+          FARMERXENTIAL v3.0<br/>
+          LALISHANK HOLDINGS LIMITED
+        </div>
+      </div>
 
       <style>{`
         @keyframes pulse {
@@ -195,6 +233,6 @@ export default function Navbar({ page, setPage, onLogout, isSlowLoading }) {
           .mobile-only  { display: block !important; }
         }
       `}</style>
-    </div>
+    </>
   );
 }
