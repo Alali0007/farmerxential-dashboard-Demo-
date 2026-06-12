@@ -1,3 +1,5 @@
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import { useState, useEffect, useRef } from 'react';
 import { submitFieldData, getMySubmissions } from '../api/farmerxential';
 
@@ -94,45 +96,140 @@ function centrePoint(points) {
   };
 }
 
-function BoundaryCanvas({ points, isWalking }) {
-  const canvasRef = useRef(null);
+// ── Leaflet boundary map ──────────────────────────────────────
+function BoundaryMap({ points, isWalking, currentPos }) {
+  const mapRef         = useRef(null);
+  const leafletMap     = useRef(null);
+  const polylineRef    = useRef(null);
+  const polygonRef     = useRef(null);
+  const startMarker    = useRef(null);
+  const liveMarker     = useRef(null);
+  const initialFly     = useRef(false);
+
+  const NIGERIA_CENTER = [9.0820, 8.6753];
+  const NIGERIA_ZOOM   = 6;
+
+  // Initialise map once
   useEffect(() => {
-    if (!canvasRef.current || points.length < 2) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const lats = points.map(p => p.lat), lngs = points.map(p => p.lng);
-    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-    const pad = 20, w = canvas.width - pad * 2, h = canvas.height - pad * 2;
-    const toX = lng => pad + ((lng - minLng) / (maxLng - minLng || 1)) * w;
-    const toY = lat => pad + ((maxLat - lat) / (maxLat - minLat || 1)) * h;
-    ctx.beginPath();
-    ctx.moveTo(toX(points[0].lng), toY(points[0].lat));
-    points.forEach(p => ctx.lineTo(toX(p.lng), toY(p.lat)));
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(27,67,50,0.4)';
-    ctx.fill();
-    ctx.strokeStyle = GOLD;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    points.forEach((p, i) => {
-      ctx.beginPath();
-      ctx.arc(toX(p.lng), toY(p.lat), i === 0 ? 6 : 3, 0, Math.PI * 2);
-      ctx.fillStyle = i === 0 ? RED : GOLD;
-      ctx.fill();
+    if (!mapRef.current || leafletMap.current) return;
+
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
     });
-    ctx.fillStyle = WHITE;
-    ctx.font = '10px monospace';
-    ctx.fillText('START', toX(points[0].lng) + 8, toY(points[0].lat) + 4);
+
+    const map = L.map(mapRef.current, {
+      center: NIGERIA_CENTER,
+      zoom: NIGERIA_ZOOM,
+      zoomControl: true,
+      attributionControl: false,
+      // Restrict panning loosely around Nigeria/Africa
+      maxBounds: [[-5, -10], [25, 25]],
+      maxBoundsViscosity: 0.8
+    });
+
+    // Satellite imagery — Esri, free, no API key
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 20, tileSize: 256 }
+    ).addTo(map);
+
+    // Label overlay so Jim can see town/city names
+    L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+      { subdomains: 'abcd', maxZoom: 20, opacity: 0.6 }
+    ).addTo(map);
+
+    leafletMap.current = map;
+
+    return () => {
+      if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; }
+    };
+  }, []);
+
+  // Draw boundary as points accumulate
+  useEffect(() => {
+    if (!leafletMap.current || points.length < 1) return;
+    const lls = points.map(p => [p.lat, p.lng]);
+
+    // Walking path line
+    if (polylineRef.current) {
+      polylineRef.current.setLatLngs(lls);
+    } else {
+      polylineRef.current = L.polyline(lls, { color: GOLD, weight: 3, opacity: 0.95 }).addTo(leafletMap.current);
+    }
+
+    // Filled polygon
+    if (points.length >= 3) {
+      if (polygonRef.current) {
+        polygonRef.current.setLatLngs(lls);
+      } else {
+        polygonRef.current = L.polygon(lls, {
+          color: GOLD, fillColor: GREEN, fillOpacity: 0.35, weight: 2
+        }).addTo(leafletMap.current);
+      }
+    }
+
+    // Red START marker
+    if (!startMarker.current) {
+      const icon = L.divIcon({
+        html: '<div style="width:14px;height:14px;background:#E24B4A;border-radius:50%;border:2px solid white;"></div>',
+        iconSize: [14, 14], iconAnchor: [7, 7], className: ''
+      });
+      startMarker.current = L.marker([points[0].lat, points[0].lng], { icon })
+        .bindTooltip('START', { permanent: true, direction: 'right' })
+        .addTo(leafletMap.current);
+    }
+
+    // Pan to latest point while walking
+    if (isWalking) {
+      const last = points[points.length - 1];
+      leafletMap.current.panTo([last.lat, last.lng], { animate: true, duration: 0.3 });
+    }
+  }, [points, isWalking]);
+
+  // Live position blue dot
+  useEffect(() => {
+    if (!leafletMap.current || !currentPos) return;
+
+    const icon = L.divIcon({
+      html: '<div style="width:18px;height:18px;background:#2196F3;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(33,150,243,0.9);"></div>',
+      iconSize: [18, 18], iconAnchor: [9, 9], className: ''
+    });
+
+    if (liveMarker.current) {
+      liveMarker.current.setLatLng([currentPos.lat, currentPos.lng]);
+    } else {
+      liveMarker.current = L.marker([currentPos.lat, currentPos.lng], { icon }).addTo(leafletMap.current);
+    }
+
+    // First GPS fix — fly from Nigeria overview to exact location
+    if (!initialFly.current) {
+      leafletMap.current.flyTo([currentPos.lat, currentPos.lng], 19, { animate: true, duration: 2 });
+      initialFly.current = true;
+    }
+  }, [currentPos]);
+
+  // Reset when points cleared
+  useEffect(() => {
+    if (points.length === 0 && leafletMap.current) {
+      if (polylineRef.current)  { polylineRef.current.remove();  polylineRef.current  = null; }
+      if (polygonRef.current)   { polygonRef.current.remove();   polygonRef.current   = null; }
+      if (startMarker.current)  { startMarker.current.remove();  startMarker.current  = null; }
+      if (liveMarker.current)   { liveMarker.current.remove();   liveMarker.current   = null; }
+      initialFly.current = false;
+      leafletMap.current.flyTo(NIGERIA_CENTER, NIGERIA_ZOOM, { animate: true, duration: 1 });
+    }
   }, [points]);
 
-  if (points.length < 2) return (
-    <div style={{ height: 200, background: '#0a1628', borderRadius: 8, border: '1px dashed #2a3a4a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: GREY, fontFamily: 'monospace', fontSize: 12, marginBottom: 16 }}>
-      {isWalking ? '⏳ Walk the boundary to see the map...' : 'Boundary map will appear here'}
-    </div>
+  return (
+    <div ref={mapRef} style={{
+      width: '100%', height: 320, borderRadius: 8,
+      border: `1px solid ${GREEN}`, marginBottom: 16, overflow: 'hidden'
+    }} />
   );
-  return <canvas ref={canvasRef} width={320} height={200} style={{ width: '100%', borderRadius: 8, border: `1px solid ${GREEN}`, marginBottom: 16, display: 'block' }} />;
 }
 
 const SummaryRow = ({ label, value }) => (
@@ -204,15 +301,12 @@ export default function FieldAgentPage() {
     if (apiKey.length < 20) { setLoginError('Key looks too short — check it'); return; }
     localStorage.setItem('fx_field_key', apiKey);
     localStorage.setItem('fx_field_name', agentName);
-    setLoginError('');
-    setScreen('form');
+    setLoginError(''); setScreen('form');
   };
 
   const capturePhoto = (type) => {
     const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment';
+    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
     input.onchange = (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -226,9 +320,7 @@ export default function FieldAgentPage() {
 
   const startBoundaryWalk = () => {
     if (!navigator.geolocation) { alert('GPS not available on this device'); return; }
-    setBoundaryPoints([]);
-    setBoundaryArea(null);
-    setIsWalking(true);
+    setBoundaryPoints([]); setBoundaryArea(null); setIsWalking(true);
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const newPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
@@ -249,8 +341,7 @@ export default function FieldAgentPage() {
 
   const stopBoundaryWalk = () => {
     if (gpsWatcher) navigator.geolocation.clearWatch(gpsWatcher);
-    setGpsWatcher(null);
-    setIsWalking(false);
+    setGpsWatcher(null); setIsWalking(false);
     if (boundaryPoints.length < 3) { alert('Not enough points. Walk further around the farm.'); return; }
     const area = calculatePolygonArea(boundaryPoints);
     const centre = centrePoint(boundaryPoints);
@@ -267,12 +358,9 @@ export default function FieldAgentPage() {
     }
     if (activeModule === 8) {
       if (!form.farm_gps_lat || !form.farm_gps_lng) { alert('Farm boundary mapping is required. Walk the boundary first.'); return; }
-      setScreen('summary');
-      window.scrollTo(0, 0);
-      return;
+      setScreen('summary'); window.scrollTo(0, 0); return;
     }
-    setActiveModule(m => m + 1);
-    window.scrollTo(0, 0);
+    setActiveModule(m => m + 1); window.scrollTo(0, 0);
   };
 
   const goPrev = () => { if (activeModule > 1) { setActiveModule(m => m - 1); window.scrollTo(0, 0); } };
@@ -295,22 +383,16 @@ export default function FieldAgentPage() {
         photo_extra: photos.extra || null,
       };
       const result = await submitFieldData(apiKey, payload);
-      setSubmitResult(result);
-      setScreen('success');
+      setSubmitResult(result); setScreen('success');
     } catch (err) {
       alert(`Error: ${err?.response?.data?.detail || 'Submission failed. Check your connection.'}`);
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   const loadHistory = async () => {
-    setScreen('history');
-    setLoadingHistory(true);
-    try {
-      const result = await getMySubmissions(apiKey);
-      setSubmissions(result.submissions || []);
-    } catch { alert('Could not load submissions.'); }
+    setScreen('history'); setLoadingHistory(true);
+    try { const result = await getMySubmissions(apiKey); setSubmissions(result.submissions || []); }
+    catch { alert('Could not load submissions.'); }
     finally { setLoadingHistory(false); }
   };
 
@@ -452,7 +534,6 @@ export default function FieldAgentPage() {
           <SummarySection title="🏥 HEALTH" rows={[['Distance to Health', form.distance_to_health], ['Insurance', form.has_health_insurance], ['Illness (12m)', form.household_illness_12m], ['Water Source', form.water_source], ['Pesticides', form.uses_pesticides], ['Protection', form.uses_protective_equipment]]} />
           <SummarySection title="🛒 SUPPLY CHAIN" rows={[['Harvest Behaviour', form.harvest_behaviour], ['Primary Buyer', form.primary_buyer], ['Time to Sell', form.time_to_sell], ['Storage', form.has_storage], ['Post-Harvest Challenge', form.postharvest_challenge], ['Fertiliser Brand', form.fertiliser_brand || '—'], ['Input Source', form.input_purchase_source]]} />
           <SummarySection title="📱 DIGITAL" rows={[['Phone Type', form.phone_type], ['WhatsApp', form.uses_whatsapp], ['Agri App', form.uses_agri_app], ['Training', form.attended_training], ['Learning Interest', form.preferred_learning_topic], ['Language', form.preferred_language], ['Advice Source', form.advice_source]]} />
-
           <div style={{ marginBottom: 20 }}>
             <div style={{ color: GOLD, fontFamily: 'monospace', fontSize: 11, fontWeight: 'bold', letterSpacing: 1, marginBottom: 8, paddingBottom: 4, borderBottom: `1px solid ${GREEN}` }}>📷 PHOTOS</div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -470,7 +551,6 @@ export default function FieldAgentPage() {
               ))}
             </div>
           </div>
-
           {form.field_agent_notes && <SummarySection title="📝 NOTES" rows={[['Notes', form.field_agent_notes]]} />}
         </Card>
         <div style={{ marginBottom: 32 }}>
@@ -488,7 +568,6 @@ export default function FieldAgentPage() {
         <TopBar />
         <ModuleTabs />
 
-        {/* MODULE 1 */}
         {activeModule === 1 && (
           <Card>
             <SectionHeader number="📍" title="LOCATION" />
@@ -496,7 +575,6 @@ export default function FieldAgentPage() {
             <Select value={form.lga} onChange={set('lga')} options={BAYELSA_LGAS} placeholder="Select LGA" />
             <Label required>COMMUNITY</Label>
             <Input value={form.community} onChange={set('community')} placeholder="Community name" />
-
             <SectionHeader number="1A" title="FARMER IDENTITY" />
             <Label required>FULL NAME</Label>
             <Input value={form.farmer_name} onChange={set('farmer_name')} placeholder="Farmer's full name" />
@@ -508,7 +586,6 @@ export default function FieldAgentPage() {
             <Select value={form.farmer_age_range} onChange={set('farmer_age_range')} options={['18 – 30', '31 – 45', '46 – 60', '61 and above']} placeholder="Select age range" />
             <Label>HIGHEST EDUCATION LEVEL IN HOUSEHOLD</Label>
             <Select value={form.household_education_level} onChange={set('household_education_level')} options={['No formal education', 'Primary school', 'Secondary school', 'Tertiary / University', 'Vocational / Technical']} placeholder="Select level" />
-
             <SectionHeader number="1B" title="HOUSEHOLD PROFILE" />
             <Label>TOTAL PEOPLE IN HOUSEHOLD</Label>
             <Input value={form.household_size} onChange={set('household_size')} placeholder="e.g. 6" type="number" />
@@ -516,7 +593,6 @@ export default function FieldAgentPage() {
             <Input value={form.working_adults} onChange={set('working_adults')} placeholder="e.g. 2" type="number" />
             <Label>DEPENDANTS (children, elderly, ill)</Label>
             <Input value={form.dependants} onChange={set('dependants')} placeholder="e.g. 4" type="number" />
-
             <SectionHeader number="1C" title="FARM PROFILE" />
             <Label>LAND OWNERSHIP</Label>
             <Select value={form.land_ownership} onChange={set('land_ownership')} options={['Own', 'Rent', 'Communal / Family land', 'Borrowed']} placeholder="Select ownership" />
@@ -532,7 +608,6 @@ export default function FieldAgentPage() {
           </Card>
         )}
 
-        {/* MODULE 2 */}
         {activeModule === 2 && (
           <Card>
             <SectionHeader number="2A" title="RECENT SHOCKS" />
@@ -548,7 +623,6 @@ export default function FieldAgentPage() {
             <Select value={form.crop_loss_level} onChange={set('crop_loss_level')} options={['Yes — more than 50% loss', 'Yes — 25 to 50% loss', 'Yes — less than 25% loss', 'No crop loss']} placeholder="Select option" />
             <Label>SERIOUS ILLNESS OR DEATH IN HOUSEHOLD?</Label>
             <Select value={form.household_illness_death} onChange={set('household_illness_death')} options={['Yes — death of income earner', 'Yes — serious illness', 'No']} placeholder="Select option" />
-
             <SectionHeader number="2B" title="ACCESS & SUPPORT" />
             <Label>EXTENSION OFFICER VISITS THIS YEAR?</Label>
             <Select value={form.extension_visits} onChange={set('extension_visits')} options={['Yes — more than 3 visits', 'Yes — 1 to 2 visits', 'No visits']} placeholder="Select option" />
@@ -564,7 +638,6 @@ export default function FieldAgentPage() {
           </Card>
         )}
 
-        {/* MODULE 3 */}
         {activeModule === 3 && (
           <Card>
             <SectionHeader number="3" title="FINANCIAL PROFILE" />
@@ -586,7 +659,6 @@ export default function FieldAgentPage() {
           </Card>
         )}
 
-        {/* MODULE 4 */}
         {activeModule === 4 && (
           <Card>
             <SectionHeader number="4" title="HEALTH & WELLBEING" />
@@ -606,7 +678,6 @@ export default function FieldAgentPage() {
           </Card>
         )}
 
-        {/* MODULE 5 */}
         {activeModule === 5 && (
           <Card>
             <SectionHeader number="5" title="SUPPLY CHAIN & MARKET" />
@@ -630,7 +701,6 @@ export default function FieldAgentPage() {
           </Card>
         )}
 
-        {/* MODULE 6 */}
         {activeModule === 6 && (
           <Card>
             <SectionHeader number="6" title="DIGITAL & LEARNING" />
@@ -655,12 +725,10 @@ export default function FieldAgentPage() {
           </Card>
         )}
 
-        {/* MODULE 7 — PHOTOS */}
         {activeModule === 7 && (
           <Card>
             <SectionHeader number="7" title="PHOTO CAPTURE" />
             <NoteBox text="All photos must be taken NOW using your camera. Do not upload old photos from your gallery. Photos are proof of your visit." />
-
             {['farmer', 'farm', 'extra'].map((type, idx) => (
               <div key={type} style={{ marginBottom: 20 }}>
                 <Label required={type !== 'extra'}>
@@ -677,7 +745,7 @@ export default function FieldAgentPage() {
                     <div style={{ position: 'absolute', top: 8, right: 8, background: '#4CAF50', color: WHITE, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontFamily: 'monospace' }}>✅ CAPTURED</div>
                   </div>
                 ) : (
-                  <div style={{ height: 100, background: '#0a1628', borderRadius: 8, border: `2px dashed ${type === 'extra' ? '#2a3a4a' : '#2a3a4a'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: GREY, fontFamily: 'monospace', fontSize: 12 }}>No photo yet</div>
+                  <div style={{ height: 100, background: '#0a1628', borderRadius: 8, border: '2px dashed #2a3a4a', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: GREY, fontFamily: 'monospace', fontSize: 12 }}>No photo yet</div>
                 )}
                 <Btn onClick={() => capturePhoto(type)} variant="outline">
                   📷 {photos[type] ? `RETAKE ${type.toUpperCase()} PHOTO` : `TAKE ${type.toUpperCase()} PHOTO${type === 'extra' ? ' (OPTIONAL)' : ''}`}
@@ -688,13 +756,16 @@ export default function FieldAgentPage() {
           </Card>
         )}
 
-        {/* MODULE 8 — BOUNDARY MAPPING */}
         {activeModule === 8 && (
           <Card>
             <SectionHeader number="8" title="FARM BOUNDARY MAPPING" />
             <NoteBox text="Walk to one corner of the farm. Press START. Walk slowly around the entire boundary. Press STOP when you return to where you started. The app calculates the exact farm size automatically." />
 
-            <BoundaryCanvas points={boundaryPoints} isWalking={isWalking} />
+            <BoundaryMap
+              points={boundaryPoints}
+              isWalking={isWalking}
+              currentPos={boundaryPoints.length > 0 ? boundaryPoints[boundaryPoints.length - 1] : null}
+            />
 
             {boundaryArea && (
               <div style={{ background: '#1a2a1a', borderRadius: 8, padding: 16, marginBottom: 16 }}>
