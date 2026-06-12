@@ -1,19 +1,31 @@
 import React, { useState } from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import MainApp from './pages/MainApp';
+import FieldAgentPage from './pages/FieldAgentPage';
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
 
-  // BrowserRouter is like installing the routing system in the whole building
-  // Everything inside it can now use URLs and navigation
   return (
     <BrowserRouter>
-      {loggedIn
-        ? <MainApp onLogout={() => setLoggedIn(false)} />
-        : <LoginPage onLogin={() => setLoggedIn(true)} />
-      }
+      <Routes>
+
+        {/* ── Field Agent Portal — standalone, no auth needed ── */}
+        {/* Jim goes to /field on his phone — completely separate from dashboard */}
+        <Route path="/field/*" element={<FieldAgentPage />} />
+
+        {/* ── Main Dashboard — requires login ── */}
+        <Route
+          path="/*"
+          element={
+            loggedIn
+              ? <MainApp onLogout={() => setLoggedIn(false)} />
+              : <LoginPage onLogin={() => setLoggedIn(true)} />
+          }
+        />
+
+      </Routes>
     </BrowserRouter>
   );
 }

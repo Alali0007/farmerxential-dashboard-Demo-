@@ -100,3 +100,85 @@ export const updateIntervention = async (interventionId, updateData) => {
   );
   return res.data;
 };
+
+// ==============================
+// FIELD AGENT FUNCTIONS
+// ==============================
+
+// Submit a new farmer registration from the field
+// Jim calls this for every farmer he visits
+// apiKey is Jim's personal field_agent key — not stored in localStorage
+export const submitFieldData = async (apiKey, formData) => {
+  const res = await axios.post(
+    `${API_BASE}/field/submit`,
+    formData,
+    {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  return res.data;
+};
+
+// Get all submissions Jim has made — so he can check their status
+// Shows him which ones are pending, flagged, approved, or rejected
+export const getMySubmissions = async (apiKey, limit = 50, offset = 0) => {
+  const res = await axios.get(
+    `${API_BASE}/field/my-submissions`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      params: { limit, offset }
+    }
+  );
+  return res.data;
+};
+
+// ==============================
+// ADMIN STAGING FUNCTIONS
+// ==============================
+
+// Get all submissions in the staging inbox — admin only (you in Coventry)
+export const getAdminSubmissions = async (status = null, lga = null, limit = 50, offset = 0) => {
+  const params = { limit, offset };
+  if (status) params.status = status;
+  if (lga) params.lga = lga;
+  const res = await axios.get(
+    `${API_BASE}/admin/submissions`,
+    { headers: headers(), params }
+  );
+  return res.data;
+};
+
+// Get full detail of one submission — admin only
+export const getSubmissionDetail = async (submissionId) => {
+  const res = await axios.get(
+    `${API_BASE}/admin/submissions/${submissionId}`,
+    { headers: headers() }
+  );
+  return res.data;
+};
+
+// Approve or reject a submission — admin only (you in Coventry)
+export const reviewSubmission = async (submissionId, action, reviewedBy, rejectionReason = null) => {
+  const res = await axios.patch(
+    `${API_BASE}/admin/submissions/${submissionId}/review`,
+    {
+      action,
+      reviewed_by: reviewedBy,
+      rejection_reason: rejectionReason
+    },
+    { headers: headers() }
+  );
+  return res.data;
+};
+
+// Get GPS map data of all submissions — admin only
+export const getStagingMap = async () => {
+  const res = await axios.get(
+    `${API_BASE}/admin/staging/map`,
+    { headers: headers() }
+  );
+  return res.data;
+};
