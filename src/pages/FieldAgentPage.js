@@ -89,9 +89,14 @@ function calculatePolygonArea(points) {
 }
 
 function centrePoint(points) {
+  if (!points.length) return { lat: 0, lng: 0 };
+  return {
+    lat: parseFloat((points.reduce((s, p) => s + p.lat, 0) / points.length).toFixed(7)),
+    lng: parseFloat((points.reduce((s, p) => s + p.lng, 0) / points.length).toFixed(7))
+  };
+}
 
-// Smooth GPS path — removes outlier points that jump too far from neighbours
-// Think of it like drawing a smooth curve through noisy data points
+// Smooth GPS path — removes outlier points that jump too far
 function smoothPath(points) {
   if (points.length < 4) return points;
   const result = [points[0]];
@@ -99,26 +104,18 @@ function smoothPath(points) {
     const prev = points[i - 1];
     const curr = points[i];
     const next = points[i + 1];
-    // Calculate distance from current point to the line between prev and next
     const distPrevNext = Math.sqrt(
       Math.pow(next.lat - prev.lat, 2) + Math.pow(next.lng - prev.lng, 2)
     ) * 111000;
     const distToCurr = Math.sqrt(
       Math.pow(curr.lat - prev.lat, 2) + Math.pow(curr.lng - prev.lng, 2)
     ) * 111000;
-    // Only keep point if it is not a wild outlier (more than 15m off track)
     if (distToCurr < distPrevNext + 15) {
       result.push(curr);
     }
   }
   result.push(points[points.length - 1]);
   return result;
-}
-  if (!points.length) return { lat: 0, lng: 0 };
-  return {
-    lat: parseFloat((points.reduce((s, p) => s + p.lat, 0) / points.length).toFixed(7)),
-    lng: parseFloat((points.reduce((s, p) => s + p.lng, 0) / points.length).toFixed(7))
-  };
 }
 
 // ── Leaflet boundary map ──────────────────────────────────────
