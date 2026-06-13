@@ -132,8 +132,8 @@ function BoundaryMap({ points, isWalking, currentPos }) {
 
     // Satellite imagery — Esri, free, no API key
     L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 20, tileSize: 256 }
+      'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+      { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] }
     ).addTo(map);
 
     // Label overlay so Jim can see town/city names
@@ -207,7 +207,7 @@ function BoundaryMap({ points, isWalking, currentPos }) {
 
     // First GPS fix — fly from Nigeria overview to exact location
     if (!initialFly.current) {
-      leafletMap.current.flyTo([currentPos.lat, currentPos.lng], 19, { animate: true, duration: 2 });
+      leafletMap.current.flyTo([currentPos.lat, currentPos.lng], 18, { animate: true, duration: 2 });
       initialFly.current = true;
     }
   }, [currentPos]);
