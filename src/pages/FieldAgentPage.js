@@ -381,7 +381,7 @@ export default function FieldAgentPage() {
       if (!form.farmer_phone.trim()) { alert('Farmer phone is required'); return; }
     }
     if (activeModule === 8) {
-      if (!form.farm_gps_lat || !form.farm_gps_lng) { alert('Farm boundary mapping is required. Walk the boundary first.'); return; }
+      if (!form.farm_size_hectares) { alert('Farm size is required. Either walk the boundary or enter it manually.'); return; }
       setScreen('summary'); window.scrollTo(0, 0); return;
     }
     setActiveModule(m => m + 1); window.scrollTo(0, 0);
@@ -828,6 +828,22 @@ export default function FieldAgentPage() {
                 🔄 REDO BOUNDARY WALK
               </Btn>
             )}
+
+            {/* Manual fallback — if GPS is poor or farm near buildings */}
+            <div style={{ marginTop: 8, padding: 16, background: '#0a1628', borderRadius: 8, border: '1px dashed #2a3a4a', marginBottom: 8 }}>
+              <div style={{ color: GREY, fontFamily: 'monospace', fontSize: 11, marginBottom: 12, lineHeight: 1.6 }}>
+                ⚠ GPS signal poor or farm near buildings? Enter details manually:
+              </div>
+              <Label>FARM SIZE IN HECTARES (from farmer or land document)</Label>
+              <Input value={form.farm_size_hectares} onChange={set('farm_size_hectares')} placeholder="e.g. 1.5" type="number" />
+              <Label>GPS LATITUDE (optional)</Label>
+              <Input value={form.farm_gps_lat} onChange={set('farm_gps_lat')} placeholder="e.g. 4.9217" type="number" />
+              <Label>GPS LONGITUDE (optional)</Label>
+              <Input value={form.farm_gps_lng} onChange={set('farm_gps_lng')} placeholder="e.g. 6.2836" type="number" />
+              <div style={{ color: GOLD, fontFamily: 'monospace', fontSize: 10, lineHeight: 1.6 }}>
+                ✓ Manual entry will be flagged for coordinator verification
+              </div>
+            </div>
 
             <NavButtons onNext={goNext} nextLabel="REVIEW & SUBMIT →" nextVariant="gold" />
           </Card>
