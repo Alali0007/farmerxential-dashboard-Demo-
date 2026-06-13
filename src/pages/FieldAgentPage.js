@@ -89,6 +89,31 @@ function calculatePolygonArea(points) {
 }
 
 function centrePoint(points) {
+
+// Smooth GPS path — removes outlier points that jump too far from neighbours
+// Think of it like drawing a smooth curve through noisy data points
+function smoothPath(points) {
+  if (points.length < 4) return points;
+  const result = [points[0]];
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const next = points[i + 1];
+    // Calculate distance from current point to the line between prev and next
+    const distPrevNext = Math.sqrt(
+      Math.pow(next.lat - prev.lat, 2) + Math.pow(next.lng - prev.lng, 2)
+    ) * 111000;
+    const distToCurr = Math.sqrt(
+      Math.pow(curr.lat - prev.lat, 2) + Math.pow(curr.lng - prev.lng, 2)
+    ) * 111000;
+    // Only keep point if it is not a wild outlier (more than 15m off track)
+    if (distToCurr < distPrevNext + 15) {
+      result.push(curr);
+    }
+  }
+  result.push(points[points.length - 1]);
+  return result;
+}
   if (!points.length) return { lat: 0, lng: 0 };
   return {
     lat: parseFloat((points.reduce((s, p) => s + p.lat, 0) / points.length).toFixed(7)),
@@ -328,7 +353,7 @@ export default function FieldAgentPage() {
           if (prev.length > 0) {
             const last = prev[prev.length - 1];
             const dist = Math.sqrt(Math.pow(newPoint.lat - last.lat, 2) + Math.pow(newPoint.lng - last.lng, 2)) * 111000;
-            if (dist < 2) return prev;
+            if (dist < 5) return prev;
           }
           return [...prev, newPoint];
         });
@@ -343,8 +368,10 @@ export default function FieldAgentPage() {
     if (gpsWatcher) navigator.geolocation.clearWatch(gpsWatcher);
     setGpsWatcher(null); setIsWalking(false);
     if (boundaryPoints.length < 3) { alert('Not enough points. Walk further around the farm.'); return; }
-    const area = calculatePolygonArea(boundaryPoints);
-    const centre = centrePoint(boundaryPoints);
+    const smoothed = smoothPath(boundaryPoints);
+    setBoundaryPoints(smoothed);
+    const area = calculatePolygonArea(smoothed);
+    const centre = centrePoint(smoothed);
     setBoundaryArea(area);
     setForm(prev => ({ ...prev, farm_size_hectares: area, farm_gps_lat: centre.lat.toString(), farm_gps_lng: centre.lng.toString(), farm_gps_accuracy: '5' }));
   };
