@@ -126,8 +126,8 @@ function BoundaryMap({ points, isWalking, currentPos }) {
       zoomControl: true,
       attributionControl: false,
       // Restrict panning loosely around Nigeria/Africa
-      maxBounds: [[-5, -10], [25, 25]],
-      maxBoundsViscosity: 0.8
+
+
     });
 
     // Satellite imagery — Esri, free, no API key
