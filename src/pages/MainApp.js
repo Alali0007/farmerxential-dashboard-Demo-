@@ -6,6 +6,7 @@ import FarmersPage from './FarmersPage';
 import AlertsPage from './AlertsPage';
 import InterventionsPage from './InterventionsPage';
 import PredictPage from './PredictPage';
+import AdminInboxPage from './AdminInboxPage';
 
 const C = { bg: '#060D0A', green: '#1B4332' };
 
@@ -42,6 +43,7 @@ export default function MainApp({ onLogout }) {
     if (location.pathname === '/alerts')        return 'ALERTS';
     if (location.pathname === '/interventions') return 'INTERVENTIONS';
     if (location.pathname === '/predict')       return 'PREDICT';
+    if (location.pathname === '/admin/inbox')   return 'INBOX';
     return 'OVERVIEW';
   };
 
@@ -51,6 +53,7 @@ export default function MainApp({ onLogout }) {
     if (newPage === 'ALERTS')         navigate('/alerts');
     if (newPage === 'INTERVENTIONS')  navigate('/interventions');
     if (newPage === 'PREDICT')        navigate('/predict');
+    if (newPage === 'INBOX')          navigate('/admin/inbox');
   };
 
   return (
@@ -75,6 +78,7 @@ export default function MainApp({ onLogout }) {
         <Route path="/alerts"        element={<AlertsPage onLoadingChange={setIsLoading}/>}/>
         <Route path="/interventions" element={<InterventionsPage onLoadingChange={setIsLoading}/>}/>
         <Route path="/predict"       element={<PredictPage/>}/>
+        <Route path="/admin/inbox"   element={<AdminInboxPage/>}/>
       </Routes>
     </div>
   );
