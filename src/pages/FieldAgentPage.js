@@ -409,7 +409,22 @@ export default function FieldAgentPage() {
       const result = await submitFieldData(apiKey, payload);
       setSubmitResult(result); setScreen('success');
     } catch (err) {
-      alert(`Error: ${err?.response?.data?.detail || 'Submission failed. Check your connection.'}`);
+      // ── FIXED ERROR HANDLING ──────────────────────────────────
+      // The server sends back `detail` as a LIST of problem-notes
+      // when validation fails, e.g.
+      //   [{ loc: ["body", "farmer_phone"], msg: "must be a valid Nigerian number" }]
+      // A plain ${detail} turns that list into "[object Object]"
+      // because JS doesn't know how to print an object as text.
+      // Here we walk through each note and read out the field name
+      // (the last item in "loc") plus the message, one per line.
+      const detail = err?.response?.data?.detail;
+      let message = 'Submission failed. Check your connection.';
+      if (Array.isArray(detail)) {
+        message = detail.map(d => `${d.loc?.[d.loc.length - 1]} — ${d.msg}`).join('\n');
+      } else if (typeof detail === 'string') {
+        message = detail;
+      }
+      alert(`Submission rejected:\n\n${message}`);
     } finally { setSubmitting(false); }
   };
 
