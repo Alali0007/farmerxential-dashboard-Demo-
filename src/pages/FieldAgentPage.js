@@ -286,7 +286,7 @@ export default function FieldAgentPage() {
 
   const [form, setForm] = useState({
     lga: '', community: '',
-    farmer_name: '', farmer_phone: '', farmer_gender: '', farmer_age_range: '', household_education_level: '',
+    farmer_name: '', farmer_phone: '', farmer_nin: '', farmer_gender: '', farmer_age_range: '', household_education_level: '',
     household_size: '', working_adults: '', dependants: '',
     land_ownership: '', main_crop: '', other_crops: '', has_irrigation: '', used_fertiliser: '',
     farm_size_hectares: '', farm_gps_lat: '', farm_gps_lng: '', farm_gps_accuracy: '',
@@ -379,6 +379,7 @@ export default function FieldAgentPage() {
       if (!form.community.trim()) { alert('Please enter the community name'); return; }
       if (!form.farmer_name.trim()) { alert('Farmer name is required'); return; }
       if (!form.farmer_phone.trim()) { alert('Farmer phone is required'); return; }
+      if (!form.farmer_nin.trim()) { alert('Farmer NIN is required'); return; }
     }
     if (activeModule === 8) {
       if (!form.farm_size_hectares) { alert('Farm size is required. Either walk the boundary or enter it manually.'); return; }
@@ -565,7 +566,7 @@ export default function FieldAgentPage() {
         </div>
         <Card>
           <SummarySection title="📍 LOCATION" rows={[['LGA', form.lga], ['Community', form.community], ['State', 'Bayelsa']]} />
-          <SummarySection title="👤 FARMER IDENTITY" rows={[['Full Name', form.farmer_name], ['Phone', form.farmer_phone], ['Gender', form.farmer_gender], ['Age Range', form.farmer_age_range], ['Education', form.household_education_level]]} />
+          <SummarySection title="👤 FARMER IDENTITY" rows={[['Full Name', form.farmer_name], ['Phone', form.farmer_phone], ['NIN', form.farmer_nin], ['Gender', form.farmer_gender], ['Age Range', form.farmer_age_range], ['Education', form.household_education_level]]} />
           <SummarySection title="🏠 HOUSEHOLD" rows={[['Household Size', form.household_size], ['Working Adults', form.working_adults], ['Dependants', form.dependants]]} />
           <SummarySection title="🌾 FARM" rows={[['Land Ownership', form.land_ownership], ['Main Crop', form.main_crop], ['Other Crops', form.other_crops || '—'], ['Irrigation', form.has_irrigation], ['Fertiliser', form.used_fertiliser], ['Farm Size', form.farm_size_hectares ? `${form.farm_size_hectares} ha` : null], ['GPS Lat', form.farm_gps_lat], ['GPS Lng', form.farm_gps_lng], ['Boundary Points', boundaryPoints.length ? `${boundaryPoints.length} points` : null]]} />
           <SummarySection title="⚡ SHOCKS" rows={[['Flooding', form.experienced_flooding], ['Drought', form.experienced_drought], ['Pest Attack', form.experienced_pest_attack], ['Crop Disease', form.experienced_crop_disease], ['Crop Loss', form.crop_loss_level], ['Household Shock', form.household_illness_death], ['Extension Visits', form.extension_visits], ['Received Assistance', form.received_assistance], ['Distance to Market', form.distance_to_market], ['Transport Cost', form.transport_cost]]} />
@@ -619,6 +620,8 @@ export default function FieldAgentPage() {
             <Input value={form.farmer_name} onChange={set('farmer_name')} placeholder="Farmer's full name" />
             <Label required>PHONE NUMBER</Label>
             <Input value={form.farmer_phone} onChange={set('farmer_phone')} placeholder="e.g. 08012345678" type="tel" />
+            <Label required>NIN (NATIONAL ID NUMBER)</Label>
+            <Input value={form.farmer_nin} onChange={set('farmer_nin')} placeholder="11-digit NIN" type="tel" />
             <Label>GENDER</Label>
             <Select value={form.farmer_gender} onChange={set('farmer_gender')} options={['Male', 'Female']} placeholder="Select gender" />
             <Label>AGE RANGE</Label>
