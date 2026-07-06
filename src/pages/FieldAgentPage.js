@@ -205,10 +205,10 @@ function BoundaryMap({ points, isWalking, currentPos }) {
         .addTo(leafletMap.current);
     }
 
-    // Pan to latest point while walking
-    if (isWalking) {
+    // Fly to latest pin so Jim can confirm it landed in the right place
+    if (points.length > 0) {
       const last = points[points.length - 1];
-      leafletMap.current.panTo([last.lat, last.lng], { animate: true, duration: 0.3 });
+      leafletMap.current.panTo([last.lat, last.lng], { animate: true, duration: 0.4 });
     }
   }, [points, isWalking]);
 
@@ -278,10 +278,10 @@ export default function FieldAgentPage() {
   const [submissions, setSubmissions]   = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [activeModule, setActiveModule] = useState(1);
-  const [isWalking, setIsWalking]       = useState(false);
+  const [isPinning, setIsPinning]           = useState(false);  // pin mode active
   const [boundaryPoints, setBoundaryPoints] = useState([]);
-  const [boundaryArea, setBoundaryArea] = useState(null);
-  const [gpsWatcher, setGpsWatcher]     = useState(null);
+  const [boundaryArea, setBoundaryArea]     = useState(null);
+  const [pinLoading, setPinLoading]         = useState(false);  // waiting for GPS fix
   const [photos, setPhotos]             = useState({ farmer: null, farm: null, extra: null });
 
   const [form, setForm] = useState({
@@ -313,9 +313,7 @@ export default function FieldAgentPage() {
     if (k && n) { setApiKey(k); setAgentName(n); setScreen('form'); }
   }, []);
 
-  useEffect(() => {
-    return () => { if (gpsWatcher) navigator.geolocation.clearWatch(gpsWatcher); };
-  }, [gpsWatcher]);
+  // no persistent GPS watcher needed — pin mode uses one-shot getCurrentPosition
 
   const handleLogin = () => {
     if (!agentName.trim()) { setLoginError('Enter your name'); return; }
@@ -340,37 +338,75 @@ export default function FieldAgentPage() {
     input.click();
   };
 
-  const startBoundaryWalk = () => {
+  // ── PIN-AND-CONNECT boundary mapping ─────────────────────────
+  // Jim walks to each corner and taps "PIN THIS CORNER".
+  // The app records one clean GPS point per tap.
+  // Straight lines connect the pins. No zigzags.
+
+  const startPinMode = () => {
     if (!navigator.geolocation) { alert('GPS not available on this device'); return; }
-    setBoundaryPoints([]); setBoundaryArea(null); setIsWalking(true);
-    const watchId = navigator.geolocation.watchPosition(
+    setBoundaryPoints([]); setBoundaryArea(null); setIsPinning(true);
+  };
+
+  const pinCorner = () => {
+    if (!navigator.geolocation) return;
+    setPinLoading(true);
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const newPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        const newPoint = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        };
         setBoundaryPoints(prev => {
+          // Prevent duplicate pins — must be at least 5m from last pin
           if (prev.length > 0) {
             const last = prev[prev.length - 1];
-            const dist = Math.sqrt(Math.pow(newPoint.lat - last.lat, 2) + Math.pow(newPoint.lng - last.lng, 2)) * 111000;
-            if (dist < 5) return prev;
+            const dist = Math.sqrt(
+              Math.pow(newPoint.lat - last.lat, 2) +
+              Math.pow(newPoint.lng - last.lng, 2)
+            ) * 111000;
+            if (dist < 5) {
+              alert('Too close to last pin. Move further to the next corner and try again.');
+              setPinLoading(false);
+              return prev;
+            }
           }
+          setPinLoading(false);
           return [...prev, newPoint];
         });
       },
-      (err) => alert('GPS error: ' + err.message),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      (err) => { setPinLoading(false); alert('GPS error: ' + err.message + '. Move to open sky and try again.'); },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     );
-    setGpsWatcher(watchId);
   };
 
-  const stopBoundaryWalk = () => {
-    if (gpsWatcher) navigator.geolocation.clearWatch(gpsWatcher);
-    setGpsWatcher(null); setIsWalking(false);
-    if (boundaryPoints.length < 3) { alert('Not enough points. Walk further around the farm.'); return; }
-    const smoothed = smoothPath(boundaryPoints);
-    setBoundaryPoints(smoothed);
-    const area = calculatePolygonArea(smoothed);
-    const centre = centrePoint(smoothed);
+  const undoLastPin = () => {
+    setBoundaryPoints(prev => prev.slice(0, -1));
+    setBoundaryArea(null);
+  };
+
+  const completeBoundary = () => {
+    if (boundaryPoints.length < 3) {
+      alert('You need at least 3 corner pins to map a boundary. Pin more corners first.');
+      return;
+    }
+    const area = calculatePolygonArea(boundaryPoints);
+    const centre = centrePoint(boundaryPoints);
     setBoundaryArea(area);
-    setForm(prev => ({ ...prev, farm_size_hectares: area, farm_gps_lat: centre.lat.toString(), farm_gps_lng: centre.lng.toString(), farm_gps_accuracy: '5' }));
+    setIsPinning(false);
+    setForm(prev => ({
+      ...prev,
+      farm_size_hectares: area,
+      farm_gps_lat: centre.lat.toFixed(6),
+      farm_gps_lng: centre.lng.toFixed(6),
+      farm_gps_accuracy: '5'
+    }));
+  };
+
+  const resetBoundary = () => {
+    setBoundaryPoints([]); setBoundaryArea(null); setIsPinning(false);
+    setForm(p => ({ ...p, farm_size_hectares: '', farm_gps_lat: '', farm_gps_lng: '' }));
   };
 
   const goNext = () => {
@@ -801,14 +837,28 @@ export default function FieldAgentPage() {
         {activeModule === 8 && (
           <Card>
             <SectionHeader number="8" title="FARM BOUNDARY MAPPING" />
-            <NoteBox text="Walk to one corner of the farm. Press START. Walk slowly around the entire boundary. Press STOP when you return to where you started. The app calculates the exact farm size automatically." />
+            <NoteBox text="Walk to the FIRST corner of the farm and press START. Then walk to each corner and press PIN THIS CORNER. When all corners are pinned, press COMPLETE BOUNDARY. The app draws straight lines between your pins." />
 
             <BoundaryMap
               points={boundaryPoints}
-              isWalking={isWalking}
+              isWalking={isPinning}
               currentPos={boundaryPoints.length > 0 ? boundaryPoints[boundaryPoints.length - 1] : null}
             />
 
+            {/* Corner counter while pinning */}
+            {isPinning && (
+              <div style={{ background: '#0a1a0a', border: `1px solid ${GOLD}`, borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                <div style={{ color: GOLD, fontFamily: 'monospace', fontSize: 13, fontWeight: 'bold', marginBottom: 4 }}>
+                  📍 PIN MODE ACTIVE — {boundaryPoints.length} CORNER{boundaryPoints.length !== 1 ? 'S' : ''} PINNED
+                </div>
+                <div style={{ color: GREY, fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6 }}>
+                  Walk to the next corner of the farm, stand still, then press PIN THIS CORNER.
+                  {boundaryPoints.length >= 3 && ' You have enough corners to complete the boundary.'}
+                </div>
+              </div>
+            )}
+
+            {/* Boundary result */}
             {boundaryArea && (
               <div style={{ background: '#1a2a1a', borderRadius: 8, padding: 16, marginBottom: 16 }}>
                 <div style={{ color: '#4CAF50', fontFamily: 'monospace', fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>✅ BOUNDARY MAPPED</div>
@@ -818,7 +868,7 @@ export default function FieldAgentPage() {
                     <div style={{ color: WHITE, fontSize: 18, fontFamily: 'monospace', fontWeight: 'bold' }}>{boundaryArea} ha</div>
                   </div>
                   <div>
-                    <div style={{ color: GREY, fontSize: 10, fontFamily: 'monospace' }}>GPS POINTS</div>
+                    <div style={{ color: GREY, fontSize: 10, fontFamily: 'monospace' }}>CORNERS PINNED</div>
                     <div style={{ color: WHITE, fontSize: 18, fontFamily: 'monospace', fontWeight: 'bold' }}>{boundaryPoints.length}</div>
                   </div>
                   <div>
@@ -829,22 +879,33 @@ export default function FieldAgentPage() {
               </div>
             )}
 
-            {!isWalking && !boundaryArea && <Btn onClick={startBoundaryWalk} variant="primary">🚶 START BOUNDARY WALK</Btn>}
-
-            {isWalking && (
-              <>
-                <div style={{ background: '#1a0a0a', border: `1px solid ${RED}`, borderRadius: 8, padding: 12, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: RED, flexShrink: 0 }} />
-                  <div style={{ color: RED, fontFamily: 'monospace', fontSize: 12, fontWeight: 'bold' }}>RECORDING — {boundaryPoints.length} POINTS CAPTURED</div>
-                </div>
-                <Btn onClick={stopBoundaryWalk} variant="danger">⏹ STOP BOUNDARY WALK</Btn>
-              </>
+            {/* START button — before pin mode */}
+            {!isPinning && !boundaryArea && (
+              <Btn onClick={startPinMode} variant="primary">📍 START BOUNDARY MAPPING</Btn>
             )}
 
+            {/* PIN + UNDO + COMPLETE buttons — during pin mode */}
+            {isPinning && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <Btn
+                  onClick={pinCorner}
+                  variant="primary"
+                  style={{ opacity: pinLoading ? 0.6 : 1 }}
+                >
+                  {pinLoading ? '⏳ GETTING GPS FIX...' : `📍 PIN THIS CORNER (${boundaryPoints.length + 1})`}
+                </Btn>
+                {boundaryPoints.length > 0 && (
+                  <Btn onClick={undoLastPin} variant="ghost">↩ UNDO LAST PIN</Btn>
+                )}
+                {boundaryPoints.length >= 3 && (
+                  <Btn onClick={completeBoundary} variant="gold">✅ COMPLETE BOUNDARY</Btn>
+                )}
+              </div>
+            )}
+
+            {/* REDO button — after boundary complete */}
             {boundaryArea && (
-              <Btn onClick={() => { setBoundaryPoints([]); setBoundaryArea(null); setForm(p => ({ ...p, farm_size_hectares: '', farm_gps_lat: '', farm_gps_lng: '' })); }} variant="ghost">
-                🔄 REDO BOUNDARY WALK
-              </Btn>
+              <Btn onClick={resetBoundary} variant="ghost">🔄 REDO BOUNDARY MAPPING</Btn>
             )}
 
             {/* Manual fallback — if GPS is poor or farm near buildings */}
