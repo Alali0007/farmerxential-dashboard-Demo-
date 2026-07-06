@@ -119,14 +119,16 @@ function smoothPath(points) {
 }
 
 // ── Leaflet boundary map ──────────────────────────────────────
-function BoundaryMap({ points, isWalking, currentPos }) {
-  const mapRef      = useRef(null);
-  const leafletMap  = useRef(null);
-  const polylineRef = useRef(null);
-  const polygonRef  = useRef(null);
-  const pinMarkers  = useRef([]);
-  const liveMarker  = useRef(null);
-  const initialFly  = useRef(false);
+function BoundaryMap({ points, isWalking, currentPos, completed }) {
+  const mapRef        = useRef(null);
+  const leafletMap    = useRef(null);
+  const polylineRef   = useRef(null);   // open line between pins
+  const previewRef    = useRef(null);   // dashed line from last pin to blue dot
+  const polygonRef    = useRef(null);   // filled polygon — only after COMPLETE
+  const pinMarkers    = useRef([]);
+  const liveMarker    = useRef(null);
+  const initialFly    = useRef(false);
+  const lastLivePos   = useRef(null);   // throttle live updates
 
   const NIGERIA_CENTER = [9.0820, 8.6753];
   const NIGERIA_ZOOM   = 6;
@@ -139,41 +141,43 @@ function BoundaryMap({ points, isWalking, currentPos }) {
     const map = L.map(mapRef.current, {
       center: NIGERIA_CENTER, zoom: NIGERIA_ZOOM,
       zoomControl: true, attributionControl: false,
-      preferCanvas: true,   // faster rendering on mobile
+      preferCanvas: true,
     });
 
-    // OSM tiles — cache automatically in browser after first load (works offline after that)
+    // OSM base — caches after first load, works offline
     L.tileLayer(
       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       { maxZoom: 19, crossOrigin: true }
     ).addTo(map);
 
-    // Satellite layer — loads on top when online, silently skipped offline
+    // Satellite on top — ignored offline silently
     const sat = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { maxZoom: 19, opacity: 0.9, crossOrigin: true }
     );
     sat.addTo(map);
-    sat.on('tileerror', () => {}); // silently ignore tile errors offline
+    sat.on('tileerror', () => {});
 
     leafletMap.current = map;
     return () => { if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; } };
   }, []);
 
-  // ── Draw pins and lines whenever points change ────────────────
+  // ── Draw pins + open polyline whenever points change ─────────
   useEffect(() => {
     if (!leafletMap.current) return;
     const lls = points.map(p => [p.lat, p.lng]);
 
-    // ── Polyline connecting pins ──
+    // Open polyline between pinned corners — NEVER closes automatically
     if (polylineRef.current) {
       polylineRef.current.setLatLngs(lls);
     } else if (lls.length >= 2) {
-      polylineRef.current = L.polyline(lls, { color: GOLD, weight: 3, opacity: 0.95 }).addTo(leafletMap.current);
+      polylineRef.current = L.polyline(lls, {
+        color: GOLD, weight: 3, opacity: 0.95
+      }).addTo(leafletMap.current);
     }
 
-    // ── Filled polygon (3+ points) ──
-    if (lls.length >= 3) {
+    // Filled closed polygon — ONLY after completed
+    if (completed && lls.length >= 3) {
       if (polygonRef.current) {
         polygonRef.current.setLatLngs(lls);
       } else {
@@ -183,11 +187,15 @@ function BoundaryMap({ points, isWalking, currentPos }) {
       }
     }
 
-    // ── Number markers for each pin ──
-    // Remove old markers
+    // Remove polygon if reset
+    if (!completed && polygonRef.current) {
+      polygonRef.current.remove();
+      polygonRef.current = null;
+    }
+
+    // Numbered pin markers
     pinMarkers.current.forEach(m => m.remove());
     pinMarkers.current = [];
-
     points.forEach((p, i) => {
       const isFirst = i === 0;
       const icon = L.divIcon({
@@ -202,47 +210,77 @@ function BoundaryMap({ points, isWalking, currentPos }) {
         ">${isFirst ? 'S' : i + 1}</div>`,
         iconSize: [26, 26], iconAnchor: [13, 13], className: ''
       });
-      const marker = L.marker([p.lat, p.lng], { icon }).addTo(leafletMap.current);
-      pinMarkers.current.push(marker);
+      pinMarkers.current.push(
+        L.marker([p.lat, p.lng], { icon }).addTo(leafletMap.current)
+      );
     });
 
-    // Pan to latest pin smoothly — no animation lag
+    // Pan to latest pin instantly
     if (points.length > 0) {
       const last = points[points.length - 1];
       leafletMap.current.panTo([last.lat, last.lng], { animate: false });
     }
-  }, [points]);
+  }, [points, completed]);
 
-  // ── Live blue dot — real time position ───────────────────────
+  // ── Live blue dot + preview line ─────────────────────────────
   useEffect(() => {
     if (!leafletMap.current || !currentPos) return;
 
+    // Throttle — only update if moved more than ~1 metre
+    const last = lastLivePos.current;
+    if (last) {
+      const d = Math.sqrt(
+        Math.pow(currentPos.lat - last.lat, 2) +
+        Math.pow(currentPos.lng - last.lng, 2)
+      ) * 111000;
+      if (d < 1) return; // ignore tiny jitter
+    }
+    lastLivePos.current = currentPos;
+
+    // Blue dot
     const icon = L.divIcon({
       html: '<div style="width:16px;height:16px;background:#2196F3;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(33,150,243,0.8);"></div>',
       iconSize: [16, 16], iconAnchor: [8, 8], className: ''
     });
-
     if (liveMarker.current) {
       liveMarker.current.setLatLng([currentPos.lat, currentPos.lng]);
     } else {
       liveMarker.current = L.marker([currentPos.lat, currentPos.lng], { icon }).addTo(leafletMap.current);
     }
 
-    // First fix — fly to location
+    // Preview dashed line from last pin to current position
+    if (points.length > 0 && !completed) {
+      const lastPin = points[points.length - 1];
+      const previewLls = [[lastPin.lat, lastPin.lng], [currentPos.lat, currentPos.lng]];
+      if (previewRef.current) {
+        previewRef.current.setLatLngs(previewLls);
+      } else {
+        previewRef.current = L.polyline(previewLls, {
+          color: GOLD, weight: 2, opacity: 0.5, dashArray: '6 6'
+        }).addTo(leafletMap.current);
+      }
+    } else if (previewRef.current) {
+      previewRef.current.remove();
+      previewRef.current = null;
+    }
+
+    // First GPS fix — fly to location
     if (!initialFly.current) {
       leafletMap.current.flyTo([currentPos.lat, currentPos.lng], 19, { animate: true, duration: 1.5 });
       initialFly.current = true;
     }
-  }, [currentPos]);
+  }, [currentPos, points, completed]);
 
-  // ── Reset when boundary cleared ───────────────────────────────
+  // ── Reset ─────────────────────────────────────────────────────
   useEffect(() => {
     if (points.length === 0 && leafletMap.current) {
       if (polylineRef.current)  { polylineRef.current.remove();  polylineRef.current  = null; }
       if (polygonRef.current)   { polygonRef.current.remove();   polygonRef.current   = null; }
+      if (previewRef.current)   { previewRef.current.remove();   previewRef.current   = null; }
       pinMarkers.current.forEach(m => m.remove());
       pinMarkers.current = [];
       if (liveMarker.current)   { liveMarker.current.remove();   liveMarker.current   = null; }
+      lastLivePos.current = null;
       initialFly.current = false;
       leafletMap.current.setView(NIGERIA_CENTER, NIGERIA_ZOOM);
     }
@@ -842,6 +880,7 @@ export default function FieldAgentPage() {
               points={boundaryPoints}
               isWalking={isPinning}
               currentPos={livePos}
+              completed={!!boundaryArea}
             />
 
             {/* Corner counter while pinning */}
