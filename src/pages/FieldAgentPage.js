@@ -358,23 +358,8 @@ export default function FieldAgentPage() {
           lng: pos.coords.longitude,
           accuracy: pos.coords.accuracy
         };
-        setBoundaryPoints(prev => {
-          // Prevent duplicate pins — must be at least 5m from last pin
-          if (prev.length > 0) {
-            const last = prev[prev.length - 1];
-            const dist = Math.sqrt(
-              Math.pow(newPoint.lat - last.lat, 2) +
-              Math.pow(newPoint.lng - last.lng, 2)
-            ) * 111000;
-            if (dist < 5) {
-              alert('Too close to last pin. Move further to the next corner and try again.');
-              setPinLoading(false);
-              return prev;
-            }
-          }
-          setPinLoading(false);
-          return [...prev, newPoint];
-        });
+        setPinLoading(false);
+        setBoundaryPoints(prev => [...prev, newPoint]);
       },
       (err) => { setPinLoading(false); alert('GPS error: ' + err.message + '. Move to open sky and try again.'); },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
