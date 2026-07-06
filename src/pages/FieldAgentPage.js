@@ -120,105 +120,106 @@ function smoothPath(points) {
 
 // ── Leaflet boundary map ──────────────────────────────────────
 function BoundaryMap({ points, isWalking, currentPos }) {
-  const mapRef         = useRef(null);
-  const leafletMap     = useRef(null);
-  const polylineRef    = useRef(null);
-  const polygonRef     = useRef(null);
-  const startMarker    = useRef(null);
-  const liveMarker     = useRef(null);
-  const initialFly     = useRef(false);
+  const mapRef      = useRef(null);
+  const leafletMap  = useRef(null);
+  const polylineRef = useRef(null);
+  const polygonRef  = useRef(null);
+  const pinMarkers  = useRef([]);
+  const liveMarker  = useRef(null);
+  const initialFly  = useRef(false);
 
   const NIGERIA_CENTER = [9.0820, 8.6753];
   const NIGERIA_ZOOM   = 6;
 
-  // Initialise map once
+  // ── Init map once ─────────────────────────────────────────────
   useEffect(() => {
     if (!mapRef.current || leafletMap.current) return;
-
     delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-    });
 
     const map = L.map(mapRef.current, {
-      center: NIGERIA_CENTER,
-      zoom: NIGERIA_ZOOM,
-      zoomControl: true,
-      attributionControl: false,
-      // Restrict panning loosely around Nigeria/Africa
-
-
+      center: NIGERIA_CENTER, zoom: NIGERIA_ZOOM,
+      zoomControl: true, attributionControl: false,
+      preferCanvas: true,   // faster rendering on mobile
     });
 
-    // Satellite imagery — Esri, free, no API key
+    // OSM tiles — cache automatically in browser after first load (works offline after that)
     L.tileLayer(
-      'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-      { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] }
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { maxZoom: 19, crossOrigin: true }
     ).addTo(map);
 
-    // Label overlay so Jim can see town/city names
-    L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
-      { subdomains: 'abcd', maxZoom: 20, opacity: 0.6 }
-    ).addTo(map);
+    // Satellite layer — loads on top when online, silently skipped offline
+    const sat = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 19, opacity: 0.9, crossOrigin: true }
+    );
+    sat.addTo(map);
+    sat.on('tileerror', () => {}); // silently ignore tile errors offline
 
     leafletMap.current = map;
-
-    return () => {
-      if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; }
-    };
+    return () => { if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; } };
   }, []);
 
-  // Draw boundary as points accumulate
+  // ── Draw pins and lines whenever points change ────────────────
   useEffect(() => {
-    if (!leafletMap.current || points.length < 1) return;
+    if (!leafletMap.current) return;
     const lls = points.map(p => [p.lat, p.lng]);
 
-    // Walking path line
+    // ── Polyline connecting pins ──
     if (polylineRef.current) {
       polylineRef.current.setLatLngs(lls);
-    } else {
+    } else if (lls.length >= 2) {
       polylineRef.current = L.polyline(lls, { color: GOLD, weight: 3, opacity: 0.95 }).addTo(leafletMap.current);
     }
 
-    // Filled polygon
-    if (points.length >= 3) {
+    // ── Filled polygon (3+ points) ──
+    if (lls.length >= 3) {
       if (polygonRef.current) {
         polygonRef.current.setLatLngs(lls);
       } else {
         polygonRef.current = L.polygon(lls, {
-          color: GOLD, fillColor: GREEN, fillOpacity: 0.35, weight: 2
+          color: GOLD, fillColor: GREEN, fillOpacity: 0.3, weight: 2
         }).addTo(leafletMap.current);
       }
     }
 
-    // Red START marker
-    if (!startMarker.current) {
-      const icon = L.divIcon({
-        html: '<div style="width:14px;height:14px;background:#E24B4A;border-radius:50%;border:2px solid white;"></div>',
-        iconSize: [14, 14], iconAnchor: [7, 7], className: ''
-      });
-      startMarker.current = L.marker([points[0].lat, points[0].lng], { icon })
-        .bindTooltip('START', { permanent: true, direction: 'right' })
-        .addTo(leafletMap.current);
-    }
+    // ── Number markers for each pin ──
+    // Remove old markers
+    pinMarkers.current.forEach(m => m.remove());
+    pinMarkers.current = [];
 
-    // Fly to latest pin so Jim can confirm it landed in the right place
+    points.forEach((p, i) => {
+      const isFirst = i === 0;
+      const icon = L.divIcon({
+        html: `<div style="
+          width:26px;height:26px;border-radius:50%;
+          background:${isFirst ? RED : GOLD};
+          border:2px solid white;
+          display:flex;align-items:center;justify-content:center;
+          color:${isFirst ? WHITE : GREEN};
+          font-size:11px;font-weight:bold;font-family:monospace;
+          box-shadow:0 2px 6px rgba(0,0,0,0.5);
+        ">${isFirst ? 'S' : i + 1}</div>`,
+        iconSize: [26, 26], iconAnchor: [13, 13], className: ''
+      });
+      const marker = L.marker([p.lat, p.lng], { icon }).addTo(leafletMap.current);
+      pinMarkers.current.push(marker);
+    });
+
+    // Pan to latest pin smoothly — no animation lag
     if (points.length > 0) {
       const last = points[points.length - 1];
-      leafletMap.current.panTo([last.lat, last.lng], { animate: true, duration: 0.4 });
+      leafletMap.current.panTo([last.lat, last.lng], { animate: false });
     }
-  }, [points, isWalking]);
+  }, [points]);
 
-  // Live position blue dot
+  // ── Live blue dot — real time position ───────────────────────
   useEffect(() => {
     if (!leafletMap.current || !currentPos) return;
 
     const icon = L.divIcon({
-      html: '<div style="width:18px;height:18px;background:#2196F3;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(33,150,243,0.9);"></div>',
-      iconSize: [18, 18], iconAnchor: [9, 9], className: ''
+      html: '<div style="width:16px;height:16px;background:#2196F3;border-radius:50%;border:3px solid white;box-shadow:0 0 8px rgba(33,150,243,0.8);"></div>',
+      iconSize: [16, 16], iconAnchor: [8, 8], className: ''
     });
 
     if (liveMarker.current) {
@@ -227,28 +228,29 @@ function BoundaryMap({ points, isWalking, currentPos }) {
       liveMarker.current = L.marker([currentPos.lat, currentPos.lng], { icon }).addTo(leafletMap.current);
     }
 
-    // First GPS fix — fly from Nigeria overview to exact location
+    // First fix — fly to location
     if (!initialFly.current) {
-      leafletMap.current.flyTo([currentPos.lat, currentPos.lng], 18, { animate: true, duration: 2 });
+      leafletMap.current.flyTo([currentPos.lat, currentPos.lng], 19, { animate: true, duration: 1.5 });
       initialFly.current = true;
     }
   }, [currentPos]);
 
-  // Reset when points cleared
+  // ── Reset when boundary cleared ───────────────────────────────
   useEffect(() => {
     if (points.length === 0 && leafletMap.current) {
       if (polylineRef.current)  { polylineRef.current.remove();  polylineRef.current  = null; }
       if (polygonRef.current)   { polygonRef.current.remove();   polygonRef.current   = null; }
-      if (startMarker.current)  { startMarker.current.remove();  startMarker.current  = null; }
+      pinMarkers.current.forEach(m => m.remove());
+      pinMarkers.current = [];
       if (liveMarker.current)   { liveMarker.current.remove();   liveMarker.current   = null; }
       initialFly.current = false;
-      leafletMap.current.flyTo(NIGERIA_CENTER, NIGERIA_ZOOM, { animate: true, duration: 1 });
+      leafletMap.current.setView(NIGERIA_CENTER, NIGERIA_ZOOM);
     }
   }, [points]);
 
   return (
     <div ref={mapRef} style={{
-      width: '100%', height: 320, borderRadius: 8,
+      width: '100%', height: 340, borderRadius: 8,
       border: `1px solid ${GREEN}`, marginBottom: 16, overflow: 'hidden'
     }} />
   );
@@ -282,6 +284,8 @@ export default function FieldAgentPage() {
   const [boundaryPoints, setBoundaryPoints] = useState([]);
   const [boundaryArea, setBoundaryArea]     = useState(null);
   const [pinLoading, setPinLoading]         = useState(false);  // waiting for GPS fix
+  const [livePos, setLivePos]               = useState(null);   // live blue dot position
+  const livePosWatcher                      = useRef(null);     // watcher ID ref
   const [photos, setPhotos]             = useState({ farmer: null, farm: null, extra: null });
 
   const [form, setForm] = useState({
@@ -346,6 +350,13 @@ export default function FieldAgentPage() {
   const startPinMode = () => {
     if (!navigator.geolocation) { alert('GPS not available on this device'); return; }
     setBoundaryPoints([]); setBoundaryArea(null); setIsPinning(true);
+    // Start live position watcher for blue dot only — does NOT add boundary points
+    if (livePosWatcher.current) navigator.geolocation.clearWatch(livePosWatcher.current);
+    livePosWatcher.current = navigator.geolocation.watchPosition(
+      (pos) => setLivePos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+    );
   };
 
   const pinCorner = () => {
@@ -376,6 +387,8 @@ export default function FieldAgentPage() {
       alert('You need at least 3 corner pins to map a boundary. Pin more corners first.');
       return;
     }
+    // Stop live watcher
+    if (livePosWatcher.current) { navigator.geolocation.clearWatch(livePosWatcher.current); livePosWatcher.current = null; }
     const area = calculatePolygonArea(boundaryPoints);
     const centre = centrePoint(boundaryPoints);
     setBoundaryArea(area);
@@ -390,7 +403,8 @@ export default function FieldAgentPage() {
   };
 
   const resetBoundary = () => {
-    setBoundaryPoints([]); setBoundaryArea(null); setIsPinning(false);
+    if (livePosWatcher.current) { navigator.geolocation.clearWatch(livePosWatcher.current); livePosWatcher.current = null; }
+    setBoundaryPoints([]); setBoundaryArea(null); setIsPinning(false); setLivePos(null);
     setForm(p => ({ ...p, farm_size_hectares: '', farm_gps_lat: '', farm_gps_lng: '' }));
   };
 
@@ -827,7 +841,7 @@ export default function FieldAgentPage() {
             <BoundaryMap
               points={boundaryPoints}
               isWalking={isPinning}
-              currentPos={boundaryPoints.length > 0 ? boundaryPoints[boundaryPoints.length - 1] : null}
+              currentPos={livePos}
             />
 
             {/* Corner counter while pinning */}
