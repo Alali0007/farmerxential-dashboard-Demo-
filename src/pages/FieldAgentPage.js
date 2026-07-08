@@ -508,7 +508,7 @@ export default function FieldAgentPage() {
         photo_farm: photos.farm || null,
         photo_extra: photos.extra || null,
       };
-      const result = await submitFieldData(apiKey, payload);
+      const result = await submitFieldData(jwtToken, payload);
       setSubmitResult(result); setScreen('success');
     } catch (err) {
       // ── FIXED ERROR HANDLING ──────────────────────────────────
@@ -532,7 +532,7 @@ export default function FieldAgentPage() {
 
   const loadHistory = async () => {
     setScreen('history'); setLoadingHistory(true);
-    try { const result = await getMySubmissions(apiKey); setSubmissions(result.submissions || []); }
+    try { const result = await getMySubmissions(jwtToken); setSubmissions(result.submissions || []); }
     catch { alert('Could not load submissions.'); }
     finally { setLoadingHistory(false); }
   };
