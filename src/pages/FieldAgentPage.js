@@ -310,9 +310,12 @@ const SummarySection = ({ title, rows }) => (
 
 export default function FieldAgentPage() {
   const [screen, setScreen]             = useState('login');
-  const [apiKey, setApiKey]             = useState('');
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
   const [agentName, setAgentName]       = useState('');
+  const [jwtToken, setJwtToken]         = useState('');
   const [loginError, setLoginError]     = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
   const [submitting, setSubmitting]     = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
   const [submissions, setSubmissions]   = useState([]);
@@ -350,20 +353,45 @@ export default function FieldAgentPage() {
   const set = field => e => setForm(p => ({ ...p, [field]: e.target.value }));
 
   useEffect(() => {
-    const k = localStorage.getItem('fx_field_key');
-    const n = localStorage.getItem('fx_field_name');
-    if (k && n) { setApiKey(k); setAgentName(n); setScreen('form'); }
+    const t = localStorage.getItem('fx_jwt_token');
+    const n = localStorage.getItem('fx_agent_name');
+    if (t && n) { setJwtToken(t); setAgentName(n); setScreen('form'); }
   }, []);
 
   // no persistent GPS watcher needed — pin mode uses one-shot getCurrentPosition
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!agentName.trim()) { setLoginError('Enter your name'); return; }
-    if (!apiKey.trim()) { setLoginError('Enter your field agent key'); return; }
-    if (apiKey.length < 20) { setLoginError('Key looks too short — check it'); return; }
-    localStorage.setItem('fx_field_key', apiKey);
-    localStorage.setItem('fx_field_name', agentName);
-    setLoginError(''); setScreen('form');
+    if (!email.trim()) { setLoginError('Enter your email'); return; }
+    if (!password.trim()) { setLoginError('Enter your password'); return; }
+    setLoginLoading(true); setLoginError('');
+    try {
+      const res = await fetch('https://agrotech-backend-production-56f0.up.railway.app/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant': 'farmerxential-org'
+        },
+        body: JSON.stringify({ email: email.trim(), password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoginError(data?.message || 'Login failed. Check your email and password.');
+        setLoginLoading(false); return;
+      }
+      // Extract token — handle both { token } and { data: { token } } response shapes
+      const token = data?.token || data?.data?.token || data?.accessToken || data?.data?.accessToken;
+      if (!token) {
+        setLoginError('Login succeeded but no token received. Contact your supervisor.');
+        setLoginLoading(false); return;
+      }
+      localStorage.setItem('fx_jwt_token', token);
+      localStorage.setItem('fx_agent_name', agentName);
+      setJwtToken(token); setLoginLoading(false); setScreen('form');
+    } catch (err) {
+      setLoginError('Network error. Check your internet connection and try again.');
+      setLoginLoading(false);
+    }
   };
 
   const capturePhoto = (type) => {
@@ -527,7 +555,7 @@ export default function FieldAgentPage() {
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={loadHistory} style={{ background: 'transparent', border: `1px solid ${GOLD}`, color: GOLD, borderRadius: 6, padding: '6px 10px', fontFamily: 'monospace', fontSize: 10, cursor: 'pointer' }}>HISTORY</button>
-        <button onClick={() => { localStorage.removeItem('fx_field_key'); localStorage.removeItem('fx_field_name'); setScreen('login'); }} style={{ background: 'transparent', border: '1px solid #333', color: GREY, borderRadius: 6, padding: '6px 10px', fontFamily: 'monospace', fontSize: 10, cursor: 'pointer' }}>LOGOUT</button>
+        <button onClick={() => { localStorage.removeItem('fx_jwt_token'); localStorage.removeItem('fx_agent_name'); setJwtToken(''); setScreen('login'); }} style={{ background: 'transparent', border: '1px solid #333', color: GREY, borderRadius: 6, padding: '6px 10px', fontFamily: 'monospace', fontSize: 10, cursor: 'pointer' }}>LOGOUT</button>
       </div>
     </div>
   );
@@ -564,11 +592,13 @@ export default function FieldAgentPage() {
           <div style={{ color: GREY, fontFamily: 'monospace', fontSize: 11, letterSpacing: 1 }}>FIELD DATA COLLECTION</div>
         </div>
         <Label required>YOUR NAME</Label>
-        <Input value={agentName} onChange={e => setAgentName(e.target.value)} placeholder="Enter your name" />
-        <Label required>FIELD AGENT KEY</Label>
-        <Input value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste your access key" type="password" />
+        <Input value={agentName} onChange={e => setAgentName(e.target.value)} placeholder="Enter your full name" />
+        <Label required>EMAIL</Label>
+        <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter your email address" type="email" />
+        <Label required>PASSWORD</Label>
+        <Input value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" type="password" />
         {loginError && <div style={{ color: RED, fontSize: 13, marginBottom: 16, fontFamily: 'monospace' }}>⚠ {loginError}</div>}
-        <Btn onClick={handleLogin}>ACCESS FIELD PORTAL</Btn>
+        <Btn onClick={handleLogin} disabled={loginLoading}>{loginLoading ? '⏳ LOGGING IN...' : 'ACCESS FIELD PORTAL'}</Btn>
         <div style={{ textAlign: 'center', marginTop: 16, color: GREY, fontSize: 11, fontFamily: 'monospace' }}>FARMERXENTIAL v3.0 — LALISHANK HOLDINGS LIMITED</div>
       </div>
     </div>
